@@ -1,7 +1,7 @@
 ---
 name: film-acquisition-crm
 description: "Personal workflow for maintaining Tian's film acquisition CRM across Clients, Projects, and Contracts. Use when updating film-buying contacts, projects, contract follow-ups, next follow-up dates, or drafting acquisition emails from user instructions or email context. This skill defines workflow rules only; it does not contain live CRM data, fixed file paths, email transport code, or spreadsheet scripts."
-version: 1.1.0
+version: 1.2.0
 ---
 
 # Film Acquisition CRM
@@ -17,6 +17,8 @@ The CRM is an action system, not a complete database. Its core job is to answer:
 - When should Tian be reminded?
 
 Do not store live customer, project, or contract facts in this skill. Treat the CRM workbook and current emails as the source of truth.
+
+Email is the source record; CRM is the action summary. Do not copy full emails into CRM. Extract only current actionable state, next owner, next step, next follow-up date, and material commercial/legal facts that affect future action.
 
 ## Operating Boundaries
 
@@ -42,7 +44,7 @@ Use `Clients` for:
 - Company and contact information.
 - Overall relationship context.
 - Current open topics with that contact.
-- Contact-level next follow-up date.
+- Relationship-maintenance and lineup-request follow-up.
 
 Client records can be created from:
 
@@ -53,9 +55,9 @@ When creating a new client from email, search available inbox and sent-mail cont
 
 If one company has multiple contacts, keep the client record compact:
 
-- Put primary contacts in `联系人`, separated with `/` and role labels when useful, such as `JJ Nugent (对接人) / DelMarie Broco (法务)`.
-- Put matching primary emails in `邮箱`, in the same order.
-- Put additional contacts, material contacts, legal contacts, or notification-only contacts in `备注`.
+- Put only the main business contact in `业务对接人`.
+- Put only that person's email in `业务对接人邮箱`.
+- Put legal, finance, material, and notification-only contacts in `备注`.
 - In `Projects`, record the main business contact.
 - In `Contracts`, record the contacts responsible for the current contract workflow.
 
@@ -63,16 +65,31 @@ Recommended fields:
 
 - `客户ID`
 - `公司名`
-- `联系人`
-- `职位`
-- `邮箱`
+- `业务对接人`
+- `业务对接人邮箱`
 - `地区/国家`
-- `主要片库/类型`
-- `优先级`
+- `客户分级`
+- `上次收到片单日期`
+- `片单状态`
 - `上次联系日期`
 - `在谈事宜`
 - `下次跟进日期`
 - `备注`
+
+Client grading controls only relationship-maintenance and lineup-request cadence when there is no active matter:
+
+- `A`: proactively maintain every 1 month.
+- `B`: proactively maintain every 2 months.
+- `C`: no proactive relationship follow-up; contact only when there is a specific matter.
+
+Active project or contract matters do not follow client-grading cadence. Set their follow-up dates according to the matter's urgency in `Projects` or `Contracts`.
+
+Use `上次收到片单日期` and `片单状态` to track lineup health. Suggested `片单状态` values:
+
+- `有片单`
+- `待要片单`
+- `片单过期`
+- `不适用`
 
 ### Projects
 
@@ -97,9 +114,9 @@ Recommended fields:
 - `项目ID`
 - `客户ID`
 - `公司名`
-- `联系人`
+- `业务对接人`
 - `片名或片包名`
-- `当前阶段`
+- `项目状态`
 - `上次跟进日期`
 - `上次跟进内容`
 - `下一步动作`
@@ -127,14 +144,32 @@ Recommended fields:
 - `客户ID`
 - `项目ID`
 - `公司名`
-- `联系人`
+- `业务对接人`
 - `合同/项目名称`
-- `当前状态`
+- `合同状态`
+- `合同文件`
+- `付款进度`
+- `版权文件`
+- `介质/物料`
 - `上次跟进日期`
 - `上次跟进内容`
 - `下一步动作`
 - `下次跟进日期`
 - `备注`
+
+Use four execution overview fields rather than one column per micro-step:
+
+- `合同文件`: contract terms, signing, and fully signed agreement status.
+- `付款进度`: invoice, first payment, censorship-dependent balance payment, and payment status.
+- `版权文件`: draft, signed version, notarized/legalized version, and related copyright document status.
+- `介质/物料`: master, subtitles, poster, stills, trailer, and other delivery materials.
+
+Suggested compact values:
+
+- `合同文件`: `条款确认中`, `待对方签署`, `已收双方签字版`.
+- `付款进度`: `待发票`, `首款待付`, `首款已付`, `尾款待过审`, `尾款已付`.
+- `版权文件`: `待起草`, `待对方签署`, `已收签字版`, `待公证版`, `已收公证版`.
+- `介质/物料`: `未开始`, `待对方提供`, `已收`, `缺字幕`, `缺海报`.
 
 When a project becomes a contract:
 
@@ -150,7 +185,7 @@ After conversion, `Contracts` controls execution follow-up dates. `Clients` cont
 
 Use fixed status terms plus concise notes. Prefer stable statuses for filtering and reminders, then put details in `备注`.
 
-Client and project statuses:
+Project statuses:
 
 - `待我方回复`
 - `等待对方回复`
@@ -160,18 +195,22 @@ Client and project statuses:
 - `等待对方确认`
 - `已转合同`
 - `暂缓`
+- `关闭`
 
 Contract statuses:
 
 - `合同条款谈判`
-- `等待合同草稿`
 - `等待签署`
-- `等待付款`
+- `等待发票`
+- `等待首款`
 - `等待版权文件`
-- `等待物料`
-- `交付跟进`
-- `已完成`
+- `等待过审`
+- `等待尾款`
+- `等待公证版权文件`
+- `等待介质/物料`
+- `完成`
 - `暂缓`
+- `关闭`
 
 If none of these fits, use the closest status and explain the nuance in `备注`.
 
@@ -209,13 +248,17 @@ Keep the workbook visually usable after edits.
 
 Reference column widths:
 
-- `Clients`: `客户ID` 12, `公司名` 24, `联系人` 22, `邮箱` 32, `在谈事宜` 55, `下次跟进日期` 16.
+- `Clients`: `客户ID` 12, `公司名` 24, `业务对接人` 22, `业务对接人邮箱` 32, `上次收到片单日期` 16, `片单状态` 14, `在谈事宜` 55, `下次跟进日期` 16.
 - `Projects`: `片名或片包名` 35, `上次跟进内容` 55, `备注` 50.
-- `Contracts`: `上次跟进内容` 40, `备注` 40.
+- `Contracts`: `合同/项目名称` 35, `合同文件` 24, `付款进度` 24, `版权文件` 24, `介质/物料` 24, `上次跟进内容` 40, `备注` 40.
 
 ## Follow-Up Date Rules
 
-All three dimensions revolve around `下次跟进日期`.
+All three dimensions revolve around `下次跟进日期`, but the date means different things by dimension:
+
+- `Clients`: relationship maintenance and lineup requests when there is no active matter.
+- `Projects`: active acquisition opportunity follow-up before core commercial terms are confirmed.
+- `Contracts`: execution follow-up after core commercial terms are confirmed.
 
 Default timing:
 
@@ -227,6 +270,12 @@ Default timing:
 If the next action is internal review, set the date for when Tian should make that decision, not when the counterparty should reply.
 
 If the next action is waiting for the counterparty, set the date for when Tian should consider sending a reminder.
+
+For `Clients`, use client grading only when there is no active project or contract matter:
+
+- `A`: set the next relationship-maintenance date about 1 month later.
+- `B`: set the next relationship-maintenance date about 2 months later.
+- `C`: leave routine relationship follow-up blank unless there is a specific matter.
 
 ## Daily Follow-Up Check
 
@@ -241,7 +290,7 @@ When Tian asks what needs follow-up today:
    - `暂不用跟进`
 4. Explain each item with the contact, title or contract, why it is due, and the suggested next step.
 
-Keep the answer concise. Mention future non-due items only if they are important context.
+Keep client relationship-maintenance reminders separate from active project or contract follow-ups. Keep the answer concise. Mention future non-due items only if they are important context.
 
 ## Email Drafting Rules
 
@@ -291,6 +340,9 @@ When Codex cannot send email:
 - Prefer updating existing records over creating new ones.
 - Prefer concise summaries over full email copies.
 - Prefer notes in `备注` over new columns.
-- Keep signed/executing deals in `Contracts`, not active acquisition `Projects`.
+- Keep signed or executing deals in `Contracts`, not active acquisition `Projects`.
+- Keep `Clients` focused on business contacts, lineup status, relationship maintenance, and overall open topics.
+- Keep `Projects` focused on active acquisition opportunities before confirmed core commercial terms.
+- Keep `Contracts` focused on contract files, payment, copyright documents, and materials.
 - Treat the latest email and the CRM workbook as source of truth.
 - Ask Tian when a decision would materially change whether a record is created, moved to contracts, or closed.
