@@ -1,7 +1,7 @@
 ---
 name: film-acquisition-crm
 description: "Personal workflow for maintaining Tian's film acquisition CRM across Clients, Projects, and Contracts. Use when updating film-buying contacts, projects, contract follow-ups, next follow-up dates, or drafting acquisition emails from user instructions or email context. This skill defines workflow rules only; it does not contain live CRM data, fixed file paths, email transport code, or spreadsheet scripts."
-version: 1.2.0
+version: 1.2.1
 ---
 
 # Film Acquisition CRM
@@ -260,6 +260,24 @@ All three dimensions revolve around `下次跟进日期`, but the date means dif
 - `Projects`: active acquisition opportunity follow-up before core commercial terms are confirmed.
 - `Contracts`: execution follow-up after core commercial terms are confirmed.
 
+Follow-up ownership is exclusive. One matter must have only one follow-up date source:
+
+1. `Contracts` overrides `Projects` and `Clients`.
+2. `Projects` overrides `Clients`.
+3. `Clients` follow-up dates are only for relationship maintenance and lineup requests when there is no active `Project` or `Contract` matter for that client.
+
+When updating a contract matter, update only the `Contracts` follow-up date. Do not copy the same date into the related `Projects` or `Clients` rows.
+
+When updating an active project matter that has not moved to `Contracts`, update only the `Projects` follow-up date. Do not copy the same date into `Clients`.
+
+When updating client relationship maintenance or lineup requests, update `Clients` only if the client has no active `Projects` or `Contracts` requiring follow-up. If there is an active matter, leave the client-level follow-up date blank unless Tian explicitly asks for a separate relationship-maintenance reminder.
+
+If duplicate follow-up dates for the same matter are found across sheets, keep the highest-priority owner and clear the lower-priority duplicates:
+
+- Keep `Contracts`; clear related `Projects` and `Clients`.
+- If no `Contracts`, keep `Projects`; clear related `Clients`.
+- Keep `Clients` only for standalone relationship maintenance or lineup requests.
+
 Default timing:
 
 - Formal offer: follow up in 3-5 business days.
@@ -276,6 +294,8 @@ For `Clients`, use client grading only when there is no active project or contra
 - `A`: set the next relationship-maintenance date about 1 month later.
 - `B`: set the next relationship-maintenance date about 2 months later.
 - `C`: leave routine relationship follow-up blank unless there is a specific matter.
+
+After any CRM write, verify that follow-up ownership is not violated. If a project has moved to `Contracts`, the original `Projects` row must remain for history, have `项目状态 = 已转合同`, and have a blank `下次跟进日期`.
 
 ## Daily Follow-Up Check
 
