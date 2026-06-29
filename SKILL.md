@@ -1,7 +1,7 @@
 ---
 name: film-acquisition-crm
 description: "Personal workflow for maintaining Tian's film acquisition CRM across Clients, Projects, and Contracts. Use when updating film-buying contacts, projects, contract follow-ups, next follow-up dates, or drafting acquisition emails from user instructions or email context. This skill defines workflow rules only; it does not contain live CRM data, fixed file paths, email transport code, or spreadsheet scripts."
-version: 1.2.1
+version: 1.2.2
 ---
 
 # Film Acquisition CRM
@@ -226,6 +226,14 @@ When the user provides a new email, reply, or instruction:
 6. Before appending rows, ignore or compact fully empty rows so new records are added directly after the last row with real data, not after preformatted blank rows.
 7. Do not record external contract numbers as CRM identifiers. Use the CRM's own `合同ID` as the unique contract identifier. External contract numbers can remain in filenames or contract folders unless Tian explicitly asks to record them.
 
+Before every CRM write, run this preflight checklist:
+
+1. If the matter has a contract, write the follow-up date only in `Contracts`.
+2. If a project has moved to `Contracts`, `Projects.项目状态` must be `已转合同` and `Projects.下次跟进日期` must be blank.
+3. `Clients.下次跟进日期` is only for independent client-level matters, such as relationship maintenance, lineup requests, or other client-level topics. Do not copy project or contract follow-up dates into `Clients`.
+
+These checks are by matter, not by client. One client may have separate active follow-up dates for different matters across `Contracts`, `Projects`, and `Clients`, as long as the same matter is not duplicated across sheets.
+
 If the user only asks for an email draft:
 
 - Do not mark anything as sent.
@@ -245,6 +253,24 @@ Keep the workbook visually usable after edits.
 - Use plain text `YYYY-MM-DD` for all follow-up and contact dates.
 - Remove or ignore fully empty rows before appending new data.
 - Adjust obvious narrow columns when the runtime supports it, especially date and long-note fields.
+
+## Header-Driven Spreadsheet Write Rules
+
+Before modifying Excel, read and confirm the header row for the target sheet. Write cells by mapping header names to columns. Do not hand-count columns, and do not overwrite a full row with an unchecked positional array.
+
+Expected 0-based header order for validation:
+
+- `Clients`: `0=客户ID`, `1=公司名`, `2=业务对接人`, `3=业务对接人邮箱`, `4=地区/国家`, `5=客户分级`, `6=上次收到片单日期`, `7=片单状态`, `8=上次联系日期`, `9=在谈事宜`, `10=下次跟进日期`, `11=备注`.
+- `Projects`: `0=项目ID`, `1=客户ID`, `2=公司名`, `3=业务对接人`, `4=片名或片包名`, `5=项目状态`, `6=上次跟进日期`, `7=上次跟进内容`, `8=下一步动作`, `9=下次跟进日期`, `10=备注`.
+- `Contracts`: `0=合同ID`, `1=客户ID`, `2=项目ID`, `3=公司名`, `4=业务对接人`, `5=合同/项目名称`, `6=合同状态`, `7=合同文件`, `8=付款进度`, `9=版权文件`, `10=介质/物料`, `11=上次跟进日期`, `12=上次跟进内容`, `13=下一步动作`, `14=下次跟进日期`, `15=备注`.
+
+After every spreadsheet write, scan the edited rows and any related project or contract rows:
+
+- Date fields must be plain text in `YYYY-MM-DD` format.
+- `上次跟进内容` must not contain only a date.
+- `下一步动作` must contain an action or owner, not the previous follow-up summary.
+- `下次跟进日期` must contain only a date or be blank, never action text.
+- Follow-up ownership must satisfy the CRM write preflight checklist above.
 
 Reference column widths:
 
@@ -349,6 +375,36 @@ When Hermes can send email:
 - Extract recipient addresses from the original email's `From` or `Reply-To` fields when replying. Do not infer domains or addresses from memory.
 - If one user instruction involves multiple recipients or multiple separate emails, show each draft separately and require confirmation for each one before sending.
 - After confirmed sending, update the CRM with the actual send date and next follow-up date.
+
+### Email Sending Safety Rules
+
+When sending through Hermes or any script-driven mail tool:
+
+- Use a send timeout of at least 60 seconds.
+- If the command times out, the terminal disconnects, or there is no explicit SMTP failure message, do not retry immediately.
+- Before any retry, check Sent mail for a message with the same recipient, same subject, close send time, and substantially similar body.
+- If the message may have been sent but cannot be confirmed, report the uncertainty to Tian and ask before sending again.
+
+### Reply Thread Rules
+
+Replies to existing matters must stay in the original email thread by default. Do not create a new thread unless Tian explicitly asks or no thread context is available and Tian confirms sending anyway.
+
+When sending a reply:
+
+1. Prefer the current original email's `Message-ID`, `References`, subject, sender, date, and body.
+2. If the current original email is not available, search the inbox for the latest relevant email from the counterparty and use its `Message-ID`.
+3. If the inbox has no relevant counterparty email, search Sent mail for Tian's latest relevant message to that counterparty and use its `Message-ID`.
+4. Set `In-Reply-To` to the found `Message-ID`.
+5. Set `References` to the prior `References` plus the found `Message-ID` when available; otherwise use the found `Message-ID`.
+6. Preserve the original subject, including `Re:` when appropriate.
+7. Include quoted context at the bottom of the body:
+
+```text
+On [date], [name] <[email]> wrote:
+> [quoted original text]
+```
+
+If no usable `Message-ID` or original text can be found, tell Tian that the reply cannot be safely threaded and ask whether to send a new-thread email.
 
 When Codex cannot send email:
 
