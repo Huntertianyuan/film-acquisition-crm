@@ -1,7 +1,8 @@
 ---
 name: film-acquisition-crm
-description: "Personal workflow for maintaining Tian's film acquisition CRM across Clients, Projects, and Contracts. Use when updating film-buying contacts, projects, contract follow-ups, next follow-up dates, or drafting acquisition emails from user instructions or email context. This skill defines workflow rules only; it does not contain live CRM data, fixed file paths, email transport code, or spreadsheet scripts."
-version: 1.2.2
+description: "Personal workflow for maintaining Tian's film acquisition CRM across Prospects, Clients, Projects, and Contracts. Use when tracking outreach leads, promoting responsive contacts, updating film-buying contacts or projects, managing contract follow-ups, setting next follow-up dates, or drafting acquisition emails from user instructions or email context. This skill defines workflow rules only; it does not contain live CRM data, fixed file paths, email transport code, or spreadsheet scripts."
+metadata:
+  version: "1.3.0"
 ---
 
 # Film Acquisition CRM
@@ -24,16 +25,53 @@ Email is the source record; CRM is the action summary. Do not copy full emails i
 
 - Do not hardcode the CRM workbook path. The user or runtime environment must provide it.
 - Do not hardcode contract-file root folders. The user or runtime environment must provide them. Example paths may be mentioned only as examples, not defaults.
-- Do not include or assume a specific email access method.
-- Hermes may read and send email through IMAP/SMTP when available and only after user confirmation.
-- Codex should draft email text for the user to copy and send unless the user has provided another safe sending tool.
-- Do not add scripts, automations, or transport-specific logic as part of this v1 workflow.
+- Do not include or assume a specific email access method. Use the runtime's approved mailbox skill or tool when available.
+- Draft first and send only after user confirmation unless the active mailbox tool has a stricter approval rule.
+- Do not add scripts, automations, or transport-specific logic to this workflow skill.
 - Do not expose internal tool details in user-facing responses unless the user asks.
 - Respect the runtime's file-write and email-send approval mode. If a CRM update, file write, or email send requires user approval, ask for approval rather than bypassing safety controls.
 
 ## CRM Dimensions
 
-The workbook has three core tabs: `Clients`, `Projects`, and `Contracts`.
+The workbook has four core tabs: `Prospects`, `Clients`, `Projects`, and `Contracts`.
+
+### Prospects
+
+`Prospects` is the outreach pool for companies and contacts that have not yet become active CRM clients. It may contain hundreds of contacts across multiple countries.
+
+Recommended fields:
+
+- `Name`
+- `Country`
+- `Address`
+- `Zip`
+- `City`
+- `State`
+- `Tel`
+- `Fax`
+- `Activities`
+- `Emails`
+- `状态`
+
+Use only these prospect statuses:
+
+- `待联系`: no confirmed outreach has been sent.
+- `已发送待回复`: outreach was confirmed sent and there is no meaningful human reply yet. Automatic replies remain here when the contact may still be active.
+- `有效回复待处理`: a human reply shows real business interest or provides actionable acquisition context, but promotion has not yet been completed.
+- `已转Clients`: the company has been created in or matched to `Clients`.
+- `暂无需求`: a real person replied that there is no current need, but the relationship may be revisited.
+- `退信/邮箱无效`: delivery failed or the address is invalid.
+- `不再联系`: the contact opted out or Tian decided to stop outreach.
+
+Promotion rules:
+
+- Do not create a `Clients` row merely because an outreach email was sent.
+- Automatic replies, out-of-office messages, delivery notices, and silence are not meaningful replies.
+- A meaningful human reply includes interest, a catalogue or title offer, a screener or link offer, a request for more information, or another concrete business response.
+- On a meaningful human reply, create or update the matching `Clients` row, then keep the original prospect row and set `状态 = 已转Clients`.
+- Before promotion, search `Clients` by company, domain, and contact email. Update an existing client instead of creating a duplicate.
+- Do not create a `Projects` row until a specific title or package discussion begins.
+- Record bounces and corrected addresses in `Prospects`; do not promote an invalid address to `Clients`.
 
 ### Clients
 
@@ -50,6 +88,7 @@ Client records can be created from:
 
 - User-provided company, contact, and communication details.
 - A newsletter or email from a new contact when the user asks to add that contact.
+- A `Prospects` row after a meaningful human reply, following the promotion rules above.
 
 When creating a new client from email, search available inbox and sent-mail context for the same company or domain if the runtime supports it. Add any other active acquisition, project, or contract matters found for that client so related work is not split across hidden threads.
 
@@ -68,21 +107,12 @@ Recommended fields:
 - `业务对接人`
 - `业务对接人邮箱`
 - `地区/国家`
-- `客户分级`
 - `上次收到片单日期`
 - `片单状态`
 - `上次联系日期`
 - `在谈事宜`
 - `下次跟进日期`
 - `备注`
-
-Client grading controls only relationship-maintenance and lineup-request cadence when there is no active matter:
-
-- `A`: proactively maintain every 1 month.
-- `B`: proactively maintain every 2 months.
-- `C`: no proactive relationship follow-up; contact only when there is a specific matter.
-
-Active project or contract matters do not follow client-grading cadence. Set their follow-up dates according to the matter's urgency in `Projects` or `Contracts`.
 
 Use `上次收到片单日期` and `片单状态` to track lineup health. Suggested `片单状态` values:
 
@@ -185,6 +215,8 @@ After conversion, `Contracts` controls execution follow-up dates. `Clients` cont
 
 Use fixed status terms plus concise notes. Prefer stable statuses for filtering and reminders, then put details in `备注`.
 
+Prospect statuses are defined in the `Prospects` section and must not be replaced with free-form synonyms.
+
 Project statuses:
 
 - `待我方回复`
@@ -218,9 +250,9 @@ If none of these fits, use the closest status and explain the nuance in `备注`
 
 When the user provides a new email, reply, or instruction:
 
-1. Identify the relevant client, project, or contract.
+1. Identify the relevant prospect, client, project, or contract.
 2. Update an existing record when possible; do not create duplicates.
-3. Create a new client, project, or contract only when the user asks or the workflow clearly requires it.
+3. Create a new prospect, client, project, or contract only when the user asks or the workflow clearly requires it.
 4. Keep the workbook lightweight. Put complex terms, rights, pricing, tax, payment structure, delivery details, risks, censorship concerns, and replacement mechanisms into `备注` instead of creating many new columns.
 5. Store date fields as plain text in `YYYY-MM-DD` format, such as `2026-06-16`. Do not write spreadsheet date objects or datetime objects, because they may render as serial numbers, include unwanted time suffixes, or display as `######`.
 6. Before appending rows, ignore or compact fully empty rows so new records are added directly after the last row with real data, not after preformatted blank rows.
@@ -241,10 +273,10 @@ If the user only asks for an email draft:
 
 If the user says the email was sent:
 
-- Update `上次联系日期` or `上次跟进日期` to the actual sending date.
-- Summarize the sent email in `上次跟进内容`.
-- Set `下一步动作` to the expected next action.
-- Set a reasonable `下次跟进日期`.
+- First verify the message in Sent mail or receive an explicit confirmation from Tian that it was sent.
+- Only after confirmation, update the correct owner row as one atomic CRM action: set `上次联系日期` or `上次跟进日期` to the actual sending date, summarize what was sent, set the next action, and set a reasonable `下次跟进日期`.
+- If sending is uncertain, do not mark the CRM as sent or advance the last-contact date.
+- For bulk prospect outreach, update each confirmed recipient to `已发送待回复`; do not create individual `Clients` or `Projects` rows until the promotion rules are met.
 
 ## Spreadsheet Presentation Rules
 
@@ -260,12 +292,14 @@ Before modifying Excel, read and confirm the header row for the target sheet. Wr
 
 Expected 0-based header order for validation:
 
-- `Clients`: `0=客户ID`, `1=公司名`, `2=业务对接人`, `3=业务对接人邮箱`, `4=地区/国家`, `5=客户分级`, `6=上次收到片单日期`, `7=片单状态`, `8=上次联系日期`, `9=在谈事宜`, `10=下次跟进日期`, `11=备注`.
+- `Prospects`: `0=Name`, `1=Country`, `2=Address`, `3=Zip`, `4=City`, `5=State`, `6=Tel`, `7=Fax`, `8=Activities`, `9=Emails`, `10=状态`.
+- `Clients`: `0=客户ID`, `1=公司名`, `2=业务对接人`, `3=业务对接人邮箱`, `4=地区/国家`, `5=上次收到片单日期`, `6=片单状态`, `7=上次联系日期`, `8=在谈事宜`, `9=下次跟进日期`, `10=备注`.
 - `Projects`: `0=项目ID`, `1=客户ID`, `2=公司名`, `3=业务对接人`, `4=片名或片包名`, `5=项目状态`, `6=上次跟进日期`, `7=上次跟进内容`, `8=下一步动作`, `9=下次跟进日期`, `10=备注`.
 - `Contracts`: `0=合同ID`, `1=客户ID`, `2=项目ID`, `3=公司名`, `4=业务对接人`, `5=合同/项目名称`, `6=合同状态`, `7=合同文件`, `8=付款进度`, `9=版权文件`, `10=介质/物料`, `11=上次跟进日期`, `12=上次跟进内容`, `13=下一步动作`, `14=下次跟进日期`, `15=备注`.
 
 After every spreadsheet write, scan the edited rows and any related project or contract rows:
 
+- `Prospects.状态` must use the fixed vocabulary above. A row marked `已转Clients` must have a matching `Clients` record.
 - Date fields must be plain text in `YYYY-MM-DD` format.
 - `上次跟进内容` must not contain only a date.
 - `下一步动作` must contain an action or owner, not the previous follow-up summary.
@@ -274,15 +308,16 @@ After every spreadsheet write, scan the edited rows and any related project or c
 
 Reference column widths:
 
+- `Prospects`: `Name` 32, `Country` 14, `Address` 45, `Activities` 46, `Emails` 38, `状态` 18.
 - `Clients`: `客户ID` 12, `公司名` 24, `业务对接人` 22, `业务对接人邮箱` 32, `上次收到片单日期` 16, `片单状态` 14, `在谈事宜` 55, `下次跟进日期` 16.
 - `Projects`: `片名或片包名` 35, `上次跟进内容` 55, `备注` 50.
 - `Contracts`: `合同/项目名称` 35, `合同文件` 24, `付款进度` 24, `版权文件` 24, `介质/物料` 24, `上次跟进内容` 40, `备注` 40.
 
 ## Follow-Up Date Rules
 
-All three dimensions revolve around `下次跟进日期`, but the date means different things by dimension:
+The three action dimensions revolve around `下次跟进日期`, but the date means different things by dimension:
 
-- `Clients`: relationship maintenance and lineup requests when there is no active matter.
+- `Clients`: relationship maintenance, lineup requests, and other independent client-level matters.
 - `Projects`: active acquisition opportunity follow-up before core commercial terms are confirmed.
 - `Contracts`: execution follow-up after core commercial terms are confirmed.
 
@@ -290,13 +325,13 @@ Follow-up ownership is exclusive. One matter must have only one follow-up date s
 
 1. `Contracts` overrides `Projects` and `Clients`.
 2. `Projects` overrides `Clients`.
-3. `Clients` follow-up dates are only for relationship maintenance and lineup requests when there is no active `Project` or `Contract` matter for that client.
+3. `Clients` follow-up dates are only for independent client-level matters, not copies of project or contract follow-up.
 
 When updating a contract matter, update only the `Contracts` follow-up date. Do not copy the same date into the related `Projects` or `Clients` rows.
 
 When updating an active project matter that has not moved to `Contracts`, update only the `Projects` follow-up date. Do not copy the same date into `Clients`.
 
-When updating client relationship maintenance or lineup requests, update `Clients` only if the client has no active `Projects` or `Contracts` requiring follow-up. If there is an active matter, leave the client-level follow-up date blank unless Tian explicitly asks for a separate relationship-maintenance reminder.
+When updating client relationship maintenance, lineup requests, or another client-level topic, update `Clients` even if the same client has an active project or contract, provided it is genuinely a different matter. Never duplicate a project or contract reminder in `Clients`.
 
 If duplicate follow-up dates for the same matter are found across sheets, keep the highest-priority owner and clear the lower-priority duplicates:
 
@@ -315,20 +350,14 @@ If the next action is internal review, set the date for when Tian should make th
 
 If the next action is waiting for the counterparty, set the date for when Tian should consider sending a reminder.
 
-For `Clients`, use client grading only when there is no active project or contract matter:
-
-- `A`: set the next relationship-maintenance date about 1 month later.
-- `B`: set the next relationship-maintenance date about 2 months later.
-- `C`: leave routine relationship follow-up blank unless there is a specific matter.
-
 After any CRM write, verify that follow-up ownership is not violated. If a project has moved to `Contracts`, the original `Projects` row must remain for history, have `项目状态 = 已转合同`, and have a blank `下次跟进日期`.
 
 ## Daily Follow-Up Check
 
 When Tian asks what needs follow-up today:
 
-1. Check `Clients`, `Projects`, and `Contracts`.
-2. Select records where `下次跟进日期 <= today`.
+1. Check `Prospects`, `Clients`, `Projects`, and `Contracts`.
+2. Include all `Prospects` rows with `状态 = 有效回复待处理`, plus dated records where `下次跟进日期 <= today`.
 3. Group results into:
    - `需要主动发邮件`
    - `需要内部判断`
@@ -368,7 +397,7 @@ Best,
 Tian
 ```
 
-When Hermes can send email:
+When an approved mailbox tool can send email:
 
 - Draft first.
 - Ask for or require user confirmation before sending.
@@ -378,7 +407,7 @@ When Hermes can send email:
 
 ### Email Sending Safety Rules
 
-When sending through Hermes or any script-driven mail tool:
+When sending through any approved script-driven mail tool:
 
 - Use a send timeout of at least 60 seconds.
 - If the command times out, the terminal disconnects, or there is no explicit SMTP failure message, do not retry immediately.
@@ -416,6 +445,7 @@ When Codex cannot send email:
 - Prefer updating existing records over creating new ones.
 - Prefer concise summaries over full email copies.
 - Prefer notes in `备注` over new columns.
+- Keep unresponsive outreach leads in `Prospects`; promote only meaningful human replies to `Clients`.
 - Keep signed or executing deals in `Contracts`, not active acquisition `Projects`.
 - Keep `Clients` focused on business contacts, lineup status, relationship maintenance, and overall open topics.
 - Keep `Projects` focused on active acquisition opportunities before confirmed core commercial terms.
