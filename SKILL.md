@@ -2,7 +2,7 @@
 name: film-acquisition-crm
 description: "Personal workflow for maintaining Tian's film acquisition CRM across Prospects, Clients, Projects, and Contracts. Use when tracking outreach leads, promoting responsive contacts, updating film-buying contacts or projects, managing contract follow-ups, setting next follow-up dates, or drafting acquisition emails from user instructions or email context. This skill defines workflow rules only; it does not contain live CRM data, fixed file paths, email transport code, or spreadsheet scripts."
 metadata:
-  version: "1.3.0"
+  version: "1.3.1"
 ---
 
 # Film Acquisition CRM
@@ -30,6 +30,17 @@ Email is the source record; CRM is the action summary. Do not copy full emails i
 - Do not add scripts, automations, or transport-specific logic to this workflow skill.
 - Do not expose internal tool details in user-facing responses unless the user asks.
 - Respect the runtime's file-write and email-send approval mode. If a CRM update, file write, or email send requires user approval, ask for approval rather than bypassing safety controls.
+
+### Canonical Workbook Guard
+
+Before any CRM write:
+
+1. Obtain the workbook path from Tian or the active runtime context and resolve it to an absolute path.
+2. Report the exact target path before editing.
+3. Verify the expected core sheet names and header rows.
+4. Distinguish the canonical workbook from backups, exports, temporary files, downloaded copies, and files under generic `output` or `outputs` folders.
+
+Do not infer that a workbook is canonical because its filename matches, it is the newest copy, or it is inside the current workspace. If more than one plausible workbook exists, stop and ask Tian which one is authoritative. Never update a derived copy while reporting that the CRM itself was updated.
 
 ## CRM Dimensions
 
@@ -258,6 +269,27 @@ When the user provides a new email, reply, or instruction:
 6. Before appending rows, ignore or compact fully empty rows so new records are added directly after the last row with real data, not after preformatted blank rows.
 7. Do not record external contract numbers as CRM identifiers. Use the CRM's own `合同ID` as the unique contract identifier. External contract numbers can remain in filenames or contract folders unless Tian explicitly asks to record them.
 
+### Evidence-First Transaction Rules
+
+Cross-system work must follow the actual evidence order:
+
+1. Read and identify the source email or user instruction.
+2. If an attachment matters, confirm its name and type, save it to the explicitly approved destination, and verify the saved path and size.
+3. Draft the outbound email and obtain the mailbox tool's required confirmation.
+4. Send once, then verify Sent or obtain Tian's explicit confirmation of delivery.
+5. Only then write the resulting facts and dates to the canonical CRM workbook.
+
+Do not pre-commit future states. Use precise intermediate states when a workflow is incomplete:
+
+- Attachment listed in email but not saved: `邮件已收到附件，待归档`.
+- Attachment saved and verified: `已归档` plus the relevant document description.
+- Draft prepared but not sent: `待我方发送`.
+- Send confirmation requested but not completed: `待确认发送`.
+- SMTP result uncertain: `发送状态待核验`; do not advance the last-contact date.
+- Sent verified: record the actual sending date and next action.
+
+For contract documents, do not write `已归档双方签字版` merely because the email says a signed copy is attached. Require the attachment to be saved and verified first. If a step is blocked, report the last verified state and leave later CRM states unchanged unless Tian explicitly asks to record that partial state.
+
 Before every CRM write, run this preflight checklist:
 
 1. If the matter has a contract, write the follow-up date only in `Contracts`.
@@ -403,7 +435,7 @@ When an approved mailbox tool can send email:
 - Ask for or require user confirmation before sending.
 - Extract recipient addresses from the original email's `From` or `Reply-To` fields when replying. Do not infer domains or addresses from memory.
 - If one user instruction involves multiple recipients or multiple separate emails, show each draft separately and require confirmation for each one before sending.
-- After confirmed sending, update the CRM with the actual send date and next follow-up date.
+- After confirmed and verified sending, update the canonical CRM workbook with the actual send date and next follow-up date.
 
 ### Email Sending Safety Rules
 
