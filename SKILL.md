@@ -35,12 +35,13 @@ Email is the source record; CRM is the action summary. Do not copy full emails i
 
 Before any CRM write:
 
-1. Check for a project-local `.codex/film-acquisition-crm.json` file.
-2. If it contains `canonical_workbook`, treat that exact path as authoritative unless Tian explicitly overrides it for the current operation.
-3. Otherwise, obtain the workbook path from Tian or the active runtime context.
-4. Resolve the target to an absolute path and report it before editing.
-5. Verify the expected core sheet names and header rows.
-6. Distinguish the canonical workbook from backups, exports, temporary files, downloaded copies, and files under generic `output` or `outputs` folders.
+1. Check for `.codex/film-acquisition-crm.json` in the active project and then in the user's home directory.
+2. If either file contains `canonical_workbook`, treat that exact path as authoritative unless Tian explicitly overrides it for the current operation.
+3. If both files exist but name different canonical workbooks, abort and report the conflict.
+4. Otherwise, obtain the workbook path from Tian or the active runtime context.
+5. Resolve the target to an absolute path and report it before editing.
+6. Verify the expected core sheet names and header rows.
+7. Distinguish the canonical workbook from backups, exports, temporary files, downloaded copies, and files under generic `output` or `outputs` folders.
 
 Do not infer that a workbook is canonical because its filename matches, it is the newest copy, or it is inside the current workspace. If more than one plausible workbook exists, stop and ask Tian which one is authoritative. Never update a derived copy while reporting that the CRM itself was updated.
 
