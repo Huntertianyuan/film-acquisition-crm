@@ -2,7 +2,7 @@
 name: film-acquisition-crm
 description: "Personal workflow for maintaining Tian's film acquisition CRM across Prospects, Clients, Projects, and Contracts. Use when tracking outreach leads, promoting responsive contacts, updating film-buying contacts or projects, managing contract follow-ups, setting next follow-up dates, or drafting acquisition emails from user instructions or email context. This skill defines workflow rules only; it does not contain live CRM data, fixed file paths, email transport code, or spreadsheet scripts."
 metadata:
-  version: "1.3.1"
+  version: "1.3.2"
 ---
 
 # Film Acquisition CRM
@@ -35,12 +35,22 @@ Email is the source record; CRM is the action summary. Do not copy full emails i
 
 Before any CRM write:
 
-1. Obtain the workbook path from Tian or the active runtime context and resolve it to an absolute path.
-2. Report the exact target path before editing.
-3. Verify the expected core sheet names and header rows.
-4. Distinguish the canonical workbook from backups, exports, temporary files, downloaded copies, and files under generic `output` or `outputs` folders.
+1. Check for a project-local `.codex/film-acquisition-crm.json` file.
+2. If it contains `canonical_workbook`, treat that exact path as authoritative unless Tian explicitly overrides it for the current operation.
+3. Otherwise, obtain the workbook path from Tian or the active runtime context.
+4. Resolve the target to an absolute path and report it before editing.
+5. Verify the expected core sheet names and header rows.
+6. Distinguish the canonical workbook from backups, exports, temporary files, downloaded copies, and files under generic `output` or `outputs` folders.
 
 Do not infer that a workbook is canonical because its filename matches, it is the newest copy, or it is inside the current workspace. If more than one plausible workbook exists, stop and ask Tian which one is authoritative. Never update a derived copy while reporting that the CRM itself was updated.
+
+Immediately before writing, compare the resolved target with the configured `canonical_workbook`. If they differ, abort and report both paths unless Tian explicitly authorized the different target in the current request.
+
+When `allow_derived_workbook_writes` is `false`:
+
+- Do not leave an updated CRM in `output`, `outputs`, `tmp`, a drafts folder, or another same-name workbook.
+- A transient working file is allowed only when required by the spreadsheet tool. It is never authoritative and must not be presented as the updated CRM.
+- After validation, confirm that the completed write was applied to the canonical workbook path.
 
 ## CRM Dimensions
 
