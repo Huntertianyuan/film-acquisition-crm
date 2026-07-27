@@ -2,7 +2,7 @@
 name: film-acquisition-crm
 description: "Personal workflow for maintaining Tian's film acquisition CRM across Prospects, Clients, Projects, and Contracts. Use when tracking outreach leads, promoting responsive contacts, updating film-buying contacts or projects, managing contract follow-ups, setting next follow-up dates, or drafting acquisition emails from user instructions or email context. This skill defines workflow rules only; it does not contain live CRM data, fixed file paths, email transport code, or spreadsheet scripts."
 metadata:
-  version: "1.4.0"
+  version: "1.4.1"
 ---
 
 # Film Acquisition CRM
@@ -35,6 +35,9 @@ Email is the source record; CRM is the action summary. Do not copy full emails i
 
 - The Feishu spreadsheet designated by Tian is the live CRM and the only place for normal CRM updates.
 - The current live CRM URL is `https://xian-video.feishu.cn/sheets/RZYVsi2KehwvZNt2By8c1Cmpn1g?sheet=c024c3`.
+- When a Feishu Sheets Open API client or connector is configured, use it as the default read/write path for the live CRM.
+- Use browser automation only as a fallback for authentication, API troubleshooting, or visual verification. Do not default to visible browser editing when the API path is available.
+- After an API write succeeds, read the exact edited range back through the API and verify the returned values before reporting completion.
 - The local Excel workbook is an offline backup only. Do not update it as a substitute for a Feishu write, and do not report a local copy as the live CRM.
 - If Feishu is unavailable or the user is not authenticated, report the blocked live update and do not silently redirect the write to a local workbook.
 
