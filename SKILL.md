@@ -2,7 +2,7 @@
 name: film-acquisition-crm
 description: "Personal workflow for maintaining Tian's film acquisition CRM across Prospects, Clients, Projects, and Contracts. Use when tracking outreach leads, promoting responsive contacts, updating film-buying contacts or projects, managing contract follow-ups, setting next follow-up dates, or drafting acquisition emails from user instructions or email context. This skill defines workflow rules only; it does not contain live CRM data, fixed file paths, email transport code, or spreadsheet scripts."
 metadata:
-  version: "1.4.1"
+  version: "1.4.2"
 ---
 
 # Film Acquisition CRM
@@ -35,8 +35,8 @@ Email is the source record; CRM is the action summary. Do not copy full emails i
 
 - The Feishu spreadsheet designated by Tian is the live CRM and the only place for normal CRM updates.
 - The current live CRM URL is `https://xian-video.feishu.cn/sheets/RZYVsi2KehwvZNt2By8c1Cmpn1g?sheet=c024c3`.
-- When a Feishu Sheets Open API client or connector is configured, use it as the default read/write path for the live CRM.
-- Use browser automation only as a fallback for authentication, API troubleshooting, or visual verification. Do not default to visible browser editing when the API path is available.
+- Use the configured Feishu Sheets Open API client or connector as the only normal read/write path for the live CRM.
+- Never write CRM data through browser automation or Computer Use. If the API/connector is unavailable, stop and report the blocked update instead of switching to a visible browser or local workbook. Browser or Computer Use requires Tian's explicit permission before any CRM write.
 - After an API write succeeds, read the exact edited range back through the API and verify the returned values before reporting completion.
 - The local Excel workbook is an offline backup only. Do not update it as a substitute for a Feishu write, and do not report a local copy as the live CRM.
 - If Feishu is unavailable or the user is not authenticated, report the blocked live update and do not silently redirect the write to a local workbook.
@@ -243,6 +243,15 @@ When a project becomes a contract:
 
 After conversion, `Contracts` controls execution follow-up dates. `Clients` controls only relationship-level follow-up, such as seasonal check-ins or broader catalogue conversations, and does not need to mirror the contract follow-up date.
 
+### Auxiliary Sheets
+
+The evaluation-sharing sheet and the contract-review/reporting sheet are auxiliary work surfaces, not primary CRM tabs.
+
+- Do not automatically copy Projects into the evaluation sheet when a project becomes `待评估`.
+- Do not automatically copy Contracts into the contract-review sheet when a contract is created or updated.
+- Read or write either auxiliary sheet only when Tian explicitly requests that specific operation.
+- A project or contract can remain correctly recorded in the primary CRM without being present in an auxiliary sheet.
+
 ## Status Vocabulary
 
 Use fixed status terms plus concise notes. Prefer stable statuses for filtering and reminders, then put details in `备注`.
@@ -251,15 +260,11 @@ Prospect statuses are defined in the `Prospects` section and must not be replace
 
 Project statuses:
 
-- `待我方回复`
-- `等待对方回复`
-- `内部评估`
-- `待看片`
-- `待报价`
-- `等待对方确认`
-- `已转合同`
 - `暂缓`
 - `关闭`
+- `待评估`
+- `谈判`
+- `已转合同`
 
 Contract statuses:
 
@@ -286,7 +291,7 @@ When the user provides a new email, reply, or instruction:
 2. Update an existing record when possible; do not create duplicates.
 3. Create a new prospect, client, project, or contract only when the user asks or the workflow clearly requires it.
 4. Keep the workbook lightweight. Put complex terms, rights, pricing, tax, payment structure, delivery details, risks, censorship concerns, and replacement mechanisms into `备注` instead of creating many new columns.
-5. Store active date fields as plain text in `YYYY-MM-DD` format, such as `2026-06-16`. For `Projects.下次跟进日期` and `Contracts.下次跟进日期`, a terminal marker is also valid: `关闭` or `已转合同` for Projects, and `完结` for Contracts. Do not write spreadsheet date objects or datetime objects, because they may render as serial numbers, include unwanted time suffixes, or display as `######`.
+5. Store active date fields as plain text in `YYYY-MM-DD` format, such as `2026-06-16`. For `Projects.下次跟进日期`, `关闭` or `已转合同` is also valid. For `Contracts.下次跟进日期`, `完结` is for successful completion and `关闭` is for a terminated or abandoned matter. Do not write spreadsheet date objects or datetime objects, because they may render as serial numbers, include unwanted time suffixes, or display as `######`.
 6. Before appending rows, ignore or compact fully empty rows so new records are added directly after the last row with real data, not after preformatted blank rows.
 7. Do not record external contract numbers as CRM identifiers. Use the CRM's own `合同ID` as the unique contract identifier. External contract numbers can remain in filenames or contract folders unless Tian explicitly asks to record them.
 
@@ -316,7 +321,7 @@ Before every CRM write, run this preflight checklist:
 1. If the matter has a contract, write the follow-up date only in `Contracts`.
 2. If a project has moved to `Contracts`, `Projects.项目状态` must be `已转合同` and `Projects.下次跟进日期` must contain the terminal marker `已转合同`.
 3. `Clients.下次跟进日期` is only for independent client-level matters, such as relationship maintenance, lineup requests, or other client-level topics. Do not copy project or contract follow-up dates into `Clients`.
-4. `Projects.下次跟进日期` and `Contracts.下次跟进日期` must never be blank. Use an ISO date while the matter is active; use an approved terminal marker when the matter is closed, converted, or completed.
+4. `Projects.下次跟进日期` and `Contracts.下次跟进日期` must never be blank. Use an ISO date while the matter is active; use an approved terminal marker when the matter is closed, converted, or completed. If an existing row is blank, stop and ask Tian for the date or terminal state; never invent one.
 
 These checks are by matter, not by client. One client may have separate active follow-up dates for different matters across `Contracts`, `Projects`, and `Clients`, as long as the same matter is not duplicated across sheets.
 
@@ -342,7 +347,7 @@ Keep the workbook visually usable after edits.
 
 ## Header-Driven Spreadsheet Write Rules
 
-Before modifying Excel, read and confirm the header row for the target sheet. Write cells by mapping header names to columns. Do not hand-count columns, and do not overwrite a full row with an unchecked positional array.
+Before modifying any live Feishu sheet, read and confirm the header row through the API. Write cells by mapping header names to columns. Do not hand-count columns, and do not overwrite a full row with an unchecked positional array. Apply the same mapping rule to an offline backup only when Tian explicitly requests a backup operation.
 
 Expected 0-based header order for validation:
 
@@ -354,7 +359,7 @@ Expected 0-based header order for validation:
 After every spreadsheet write, scan the edited rows and any related project or contract rows:
 
 - `Prospects.状态` must use the fixed vocabulary above. A row marked `已转Clients` must have a matching `Clients` record.
-- Active date fields must be plain text in `YYYY-MM-DD` format. `Projects.下次跟进日期` may also be `关闭` or `已转合同`; `Contracts.下次跟进日期` may also be `完结`.
+- Active date fields must be plain text in `YYYY-MM-DD` format. `Projects.下次跟进日期` may also be `关闭` or `已转合同`; `Contracts.下次跟进日期` may also be `完结` or `关闭`.
 - `上次跟进内容` must not contain only a date.
 - `下一步动作` must contain an action or owner, not the previous follow-up summary.
 - `下次跟进日期` must contain an ISO date or an approved terminal marker. It must not contain arbitrary action text. Projects and Contracts must not be blank in this column.
@@ -396,6 +401,7 @@ When updating client relationship maintenance, lineup requests, or another clien
 - Project abandoned or otherwise closed: write `关闭` in `Projects.下次跟进日期` and set the corresponding project status to `关闭`.
 - Active Contract: `YYYY-MM-DD`.
 - Contract fully completed: write `完结` in `Contracts.下次跟进日期` and keep the corresponding contract status as `完成`.
+- Contract terminated or abandoned: write `关闭` in `Contracts.下次跟进日期` and keep the corresponding contract status as `关闭`.
 
 These markers are workflow values, not calendar dates. Do not place them in `上次跟进日期`, `上次联系日期`, or unrelated date columns. When reviewing or migrating existing rows, replace a blank Projects or Contracts next-follow-up cell with the appropriate marker only after confirming the row's terminal status.
 
@@ -416,7 +422,7 @@ If the next action is internal review, set the date for when Tian should make th
 
 If the next action is waiting for the counterparty, set the date for when Tian should consider sending a reminder.
 
-After any CRM write, verify that follow-up ownership is not violated. If a project has moved to `Contracts`, the original `Projects` row must remain for history, have `项目状态 = 已转合同`, and have `下次跟进日期 = 已转合同`. If a project is closed, use `下次跟进日期 = 关闭`. If a contract is complete, use `下次跟进日期 = 完结`.
+After any CRM write, verify that follow-up ownership is not violated. If a project has moved to `Contracts`, the original `Projects` row must remain for history, have `项目状态 = 已转合同`, and have `下次跟进日期 = 已转合同`. If a project is closed, use `下次跟进日期 = 关闭`. If a contract is complete, use `下次跟进日期 = 完结`; if a contract is terminated, use `下次跟进日期 = 关闭`.
 
 ## Daily Follow-Up Check
 
