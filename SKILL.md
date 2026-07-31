@@ -1,11 +1,11 @@
 ---
 name: film-acquisition-crm
-description: "Maintain Tian's film acquisition CRM across Clients, Projects, and Contracts. Use when tracking client matters, promoting a client matter into a project, managing project or contract follow-ups, checking due items, or handing verified email results into the live Feishu CRM. This skill defines workflow rules only; it does not contain live CRM data or email transport code."
+description: "Maintain Tian's film acquisition CRM across Clients, Projects, and Contracts. Use when tracking or promoting acquisition matters, managing contract checkpoints and project files, drafting copyright documents, checking due items, or handing verified email results into the live Feishu CRM. This skill defines workflow rules only; it does not contain live CRM data or email transport code."
 ---
 
 # Film Acquisition CRM
 
-Version: `1.6.0`
+Version: `1.6.1`
 
 The CRM is a compact action system. It should answer:
 
@@ -31,9 +31,12 @@ Before writing:
 
 1. Read `.codex/film-acquisition-crm.json` in the active project and then in the user home directory.
 2. If both exist, require them to agree on the primary spreadsheet and sheet IDs.
-3. Confirm that the live workbook contains exactly the core tabs `Clients`, `Projects`, and `Contracts`.
-4. Read and map the header row by name. Never hand-count columns or overwrite an unchecked positional row.
-5. Stop and report any target, tab, or header mismatch.
+3. If local contract files are involved, read `contract_archive_root` from the same configuration files and require both values to agree.
+4. Confirm that the live workbook contains exactly the core tabs `Clients`, `Projects`, and `Contracts`.
+5. Read and map the header row by name. Never hand-count columns or overwrite an unchecked positional row.
+6. Stop and report any target, tab, header, or archive-root mismatch.
+
+If an approved schema migration is still pending, do not perform normal row writes against the old layout. Migrate and verify the complete tab first, or defer the write.
 
 ## Core Model
 
@@ -161,9 +164,10 @@ The checkpoint columns contain only these exact values. Put negotiation detail, 
 Use these evidence meanings:
 
 - `双签合同电子版 = 有` only after the fully signed electronic agreement has been received, identified, and archived.
-- `版权文件 = 已起草` only after the draft exists and is archived; use `已签字` only after the counterparty-signed version has been received and archived.
+- `版权文件 = 已起草` only after all required drafts exist and are archived. Use `已签字` only after every required copyright document, such as the LOA and COT, has been signed, received, and archived. If only some documents are signed, keep `已起草` and list the missing signatures in `跟进事项`.
 - An invoice changes a payment checkpoint only to `有发票未付`. Change it to `已付` only with Tian's confirmation, payment evidence, or another explicit verified source.
-- `海牙公证文件 = 有` only after the valid final apostilled document has been received and archived. An accepted electronic apostille may count when appropriate for the deal.
+- Use `不适用` only when verified contract terms confirm that the payment category does not apply.
+- `海牙公证文件 = 有` only after every required valid final apostilled document has been received and archived. An accepted electronic apostille may count when appropriate for the deal.
 - `介质/物料 = 有` only after all required delivery items have been received and verified. Partial delivery remains `无`, with missing items listed in `跟进事项`.
 - Never infer censorship approval, payment, or complete delivery merely from a filename, an invoice, or a counterparty promise.
 
@@ -177,8 +181,8 @@ Derive the next action from objective checkpoints rather than maintaining a sepa
 4. If `版权文件 = 未起草`, prepare the document from verified contract terms. If it is `已起草`, send it for confirmation and signature when appropriate.
 5. For `待报审`, obtain or locate the censorship screener and prepare forms, subtitles, and lab materials. For `报审中`, track the expected decision date without claiming approval. For `报审完成`, move to the applicable final invoice, payment, apostille, and delivery actions.
 6. For `无需报审`, follow the deal's agreed payment and copyright-document sequence without creating censorship tasks.
-7. If payment is complete but `介质/物料 = 无`, request and verify the missing delivery items.
-8. Mark the contract `完结` in `下次跟进日期` only when all applicable payments, copyright/apostille requirements, and delivery obligations are complete. Use `关闭` only for a terminated contract.
+7. Request missing delivery items only after the deal's payment, censorship, and document prerequisites for delivery are satisfied.
+8. Mark the contract `完结` in `下次跟进日期` only when all applicable payments, censorship, copyright/apostille, and delivery obligations are complete. Use `关闭` only for a terminated contract.
 
 When multiple actions are active, keep one contract row and use the earliest actionable follow-up date. Prefix parallel work in `跟进事项`, for example `对方：发送首款发票；我方：起草版权文件`.
 
@@ -246,6 +250,16 @@ When archiving a newly received file:
 - Verify the saved file exists and is readable before updating the CRM checkpoint.
 - A file attached to an email but not yet saved does not count as archived evidence.
 
+### Copyright Document Drafting
+
+When `版权文件 = 未起草` and Tian asks Codex to prepare the documents:
+
+1. Use the fully signed agreement as the controlling source. Use an existing project document or approved precedent only for structure.
+2. Extract and cross-check the picture title, licensor, licensee, territory, term, rights, exclusivity, sublicensing, and any anti-piracy language.
+3. Prepare each required document, normally the LOA and COT, separately. Do not invent missing terms or copy another project's facts.
+4. Save drafts to the configured project folder without overwriting existing versions, then reopen and verify them.
+5. Change `版权文件` to `已起草` only after all required drafts are saved and verified. Sending, signing, and apostille remain later checkpoints.
+
 ## Spreadsheet Write Rules
 
 Expected 0-based header order:
@@ -289,13 +303,7 @@ The evaluation-sharing sheet and contract-review/reporting sheet are separate wo
 
 English acquisition emails should be short, natural, polite, and commercially specific.
 
-When preparing a send:
-
-- Use the approved Feishu work-mail tool and sender `tianyuan@osvideo.net`.
-- Reply in the original thread and reply-all by default.
-- Show Tian the complete proposed body before requesting confirmation.
-- Never mark the CRM as sent until delivery is verified.
-- After a verified send, apply the requested CRM update or show the exact proposed update.
+The approved mailbox skill owns sender identity, thread/reply-all behavior, confirmation, sending, and Sent verification. This CRM skill owns only the resulting evidence handoff: never record an email as sent before delivery is verified, and update the CRM only with verified facts.
 
 ## Decision Defaults
 
