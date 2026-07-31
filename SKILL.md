@@ -5,7 +5,7 @@ description: "Maintain Tian's film acquisition CRM across Clients, Projects, and
 
 # Film Acquisition CRM
 
-Version: `1.5.0`
+Version: `1.6.0`
 
 The CRM is a compact action system. It should answer:
 
@@ -124,7 +124,9 @@ Rules:
 
 Contracts begin after both sides confirm the core commercial terms, such as price, rights, territory, and license term. A contract must have both a `客户ID` and a `项目ID`.
 
-Keep the current Contracts structure until Tian completes the separate contract-workflow redesign:
+Contracts is an evidence-based checkpoint table. One contract occupies one row. Do not create separate rows for invoices, copyright documents, censorship, or delivery tasks.
+
+Required columns:
 
 1. `合同ID`
 2. `客户ID`
@@ -132,25 +134,62 @@ Keep the current Contracts structure until Tian completes the separate contract-
 4. `公司名`
 5. `业务对接人`
 6. `合同/项目名称`
-7. `合同状态`
-8. `合同文件`
-9. `付款进度`
-10. `版权文件`
-11. `介质/物料`
-12. `上次跟进日期`
-13. `上次跟进内容`
-14. `下一步动作`
-15. `下次跟进日期`
-16. `备注`
+7. `双签合同电子版`
+8. `版权文件`
+9. `首款`
+10. `尾款`
+11. `介质及公证费`
+12. `报审进度`
+13. `海牙公证文件`
+14. `介质/物料`
+15. `上次跟进日期`
+16. `下次跟进日期`
+17. `跟进事项`
+18. `备注`
 
-Use Contracts for contract drafting/signature, invoices and payment, copyright documents, materials, censorship-related delivery, and other post-deal execution.
+Allowed checkpoint values:
+
+- `双签合同电子版`: `有` or `无`.
+- `版权文件`: `未起草`, `已起草`, or `已签字`.
+- `首款`, `尾款`, and `介质及公证费`: `无发票`, `有发票未付`, `已付`, or `不适用`.
+- `报审进度`: `待报审`, `报审中`, `报审完成`, or `无需报审`.
+- `海牙公证文件`: `有` or `无`.
+- `介质/物料`: `有` or `无`.
+
+The checkpoint columns contain only these exact values. Put negotiation detail, partial delivery, special payment terms, single-signed contract status, version history, and exceptions in `备注` or the current `跟进事项`.
+
+Use these evidence meanings:
+
+- `双签合同电子版 = 有` only after the fully signed electronic agreement has been received, identified, and archived.
+- `版权文件 = 已起草` only after the draft exists and is archived; use `已签字` only after the counterparty-signed version has been received and archived.
+- An invoice changes a payment checkpoint only to `有发票未付`. Change it to `已付` only with Tian's confirmation, payment evidence, or another explicit verified source.
+- `海牙公证文件 = 有` only after the valid final apostilled document has been received and archived. An accepted electronic apostille may count when appropriate for the deal.
+- `介质/物料 = 有` only after all required delivery items have been received and verified. Partial delivery remains `无`, with missing items listed in `跟进事项`.
+- Never infer censorship approval, payment, or complete delivery merely from a filename, an invoice, or a counterparty promise.
+
+### Contract Next-Action Inference
+
+Derive the next action from objective checkpoints rather than maintaining a separate subjective contract-status field:
+
+1. If `双签合同电子版 = 无`, continue contract-detail negotiation or collect the missing signature; record the exact situation in `备注`.
+2. Once the agreement is fully signed, requesting the first-payment invoice and drafting the copyright document may proceed in parallel.
+3. If a payment checkpoint is `无发票`, request the applicable invoice when the deal has reached that payment point.
+4. If `版权文件 = 未起草`, prepare the document from verified contract terms. If it is `已起草`, send it for confirmation and signature when appropriate.
+5. For `待报审`, obtain or locate the censorship screener and prepare forms, subtitles, and lab materials. For `报审中`, track the expected decision date without claiming approval. For `报审完成`, move to the applicable final invoice, payment, apostille, and delivery actions.
+6. For `无需报审`, follow the deal's agreed payment and copyright-document sequence without creating censorship tasks.
+7. If payment is complete but `介质/物料 = 无`, request and verify the missing delivery items.
+8. Mark the contract `完结` in `下次跟进日期` only when all applicable payments, copyright/apostille requirements, and delivery obligations are complete. Use `关闭` only for a terminated contract.
+
+When multiple actions are active, keep one contract row and use the earliest actionable follow-up date. Prefix parallel work in `跟进事项`, for example `对方：发送首款发票；我方：起草版权文件`.
 
 When converting a project:
 
 1. Create and verify the Contracts row.
-2. Keep the Projects row for history.
-3. Set `Projects.下次跟进日期 = 已转合同`.
-4. Put future execution follow-up only in Contracts.
+2. Initialize every checkpoint with an allowed value. Determine `待报审` versus `无需报审` from verified deal requirements; ask Tian when unknown.
+3. Set a nonblank next follow-up date and concise `跟进事项`.
+4. Keep the Projects row for history.
+5. Set `Projects.下次跟进日期 = 已转合同`.
+6. Put future execution follow-up only in Contracts.
 
 For `Contracts.下次跟进日期`, use `YYYY-MM-DD` while active, `完结` after successful completion, and `关闭` if terminated.
 
@@ -186,13 +225,34 @@ Do not pre-commit future states:
 - Attachment mentioned but not saved: do not record it as archived.
 - Send verified: update the actual send date, next matter, and next follow-up date.
 
+## Contract File Evidence
+
+The live Feishu CRM remains the action system. Tian's approved local project folders are supporting evidence and the current working archive for contract documents, invoices, copyright documents, apostilles, censorship files, media, and materials.
+
+When checking a contract:
+
+1. Locate the exact project folder under the user-approved archive root.
+2. Inspect files read-only before changing CRM checkpoints.
+3. Match evidence by project, counterparty, document content, signatures, version, and date; do not rely on filenames alone.
+4. Distinguish drafts, single-signed versions, fully signed versions, invoices, signed copyright documents, apostilled documents, censorship materials, and final delivery media.
+5. Report ambiguous, conflicting, password-protected, unreadable, or unmatched files instead of guessing.
+
+When archiving a newly received file:
+
+- Use the exact existing project folder only when the match is unambiguous.
+- Preserve the original filename by default.
+- Never overwrite, delete, move, or rename an existing file without Tian's explicit instruction.
+- If the destination is uncertain, a same-name file differs, or the project folder is missing, stop and ask Tian.
+- Verify the saved file exists and is readable before updating the CRM checkpoint.
+- A file attached to an email but not yet saved does not count as archived evidence.
+
 ## Spreadsheet Write Rules
 
 Expected 0-based header order:
 
 - `Clients`: `0=客户ID`, `1=公司名`, `2=业务对接人`, `3=业务对接人邮箱`, `4=地区/国家`, `5=上次跟进日期`, `6=下次跟进日期`, `7=跟进事项`, `8=备注`.
 - `Projects`: `0=项目ID`, `1=客户ID`, `2=公司名`, `3=业务对接人`, `4=片名或片包名`, `5=上次跟进日期`, `6=下次跟进日期`, `7=跟进事项`, `8=备注`.
-- `Contracts`: `0=合同ID`, `1=客户ID`, `2=项目ID`, `3=公司名`, `4=业务对接人`, `5=合同/项目名称`, `6=合同状态`, `7=合同文件`, `8=付款进度`, `9=版权文件`, `10=介质/物料`, `11=上次跟进日期`, `12=上次跟进内容`, `13=下一步动作`, `14=下次跟进日期`, `15=备注`.
+- `Contracts`: `0=合同ID`, `1=客户ID`, `2=项目ID`, `3=公司名`, `4=业务对接人`, `5=合同/项目名称`, `6=双签合同电子版`, `7=版权文件`, `8=首款`, `9=尾款`, `10=介质及公证费`, `11=报审进度`, `12=海牙公证文件`, `13=介质/物料`, `14=上次跟进日期`, `15=下次跟进日期`, `16=跟进事项`, `17=备注`.
 
 After every write:
 
@@ -201,6 +261,7 @@ After every write:
 - Require plain-text `YYYY-MM-DD` for active dates.
 - Reject serial numbers, datetimes, `######`, or action text in date fields.
 - Require Projects and Contracts next-follow-up cells to contain a date or approved terminal marker.
+- Validate every Contracts checkpoint against its exact allowed-value set.
 - Verify the same matter is not active in multiple tabs.
 
 ## Daily Follow-Up Check
@@ -245,4 +306,5 @@ When preparing a send:
 - Use Clients for one row per client matter.
 - Keep promoted projects in Projects even when follow-up is far in the future.
 - Keep executing deals in Contracts.
+- Infer contract work from verified checkpoints and file evidence; do not maintain a redundant subjective contract-status field.
 - Ask Tian only when a decision would materially change which matter is created, deleted, closed, or converted.
