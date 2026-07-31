@@ -1,526 +1,248 @@
 ---
 name: film-acquisition-crm
-description: "Personal workflow for maintaining Tian's film acquisition CRM across Prospects, Clients, Projects, and Contracts. Use when tracking outreach leads, promoting responsive contacts, updating film-buying contacts or projects, managing contract follow-ups, setting next follow-up dates, or drafting acquisition emails from user instructions or email context. This skill defines workflow rules only; it does not contain live CRM data, fixed file paths, email transport code, or spreadsheet scripts."
-metadata:
-  version: "1.4.2"
+description: "Maintain Tian's film acquisition CRM across Clients, Projects, and Contracts. Use when tracking client matters, promoting a client matter into a project, managing project or contract follow-ups, checking due items, or handing verified email results into the live Feishu CRM. This skill defines workflow rules only; it does not contain live CRM data or email transport code."
 ---
 
 # Film Acquisition CRM
 
-This is Tian's personal workflow for film acquisition follow-up.
+Version: `1.5.0`
 
-The CRM is an action system, not a complete database. Its core job is to answer:
+The CRM is a compact action system. It should answer:
 
 - Who is involved?
-- What opportunity or contract is being discussed?
-- Who owes the next reply?
-- What should Tian do next?
-- When should Tian be reminded?
+- What matter, project, or contract needs attention?
+- What is the next action?
+- When should Tian follow up?
 
-Do not store live customer, project, or contract facts in this skill. Treat the CRM workbook and current emails as the source of truth.
-
-Email is the source record; CRM is the action summary. Do not copy full emails into CRM. Extract only current actionable state, next owner, next step, next follow-up date, and material commercial/legal facts that affect future action.
+Email is the source record; CRM is the action summary. Do not copy full emails into CRM. Keep only current follow-up facts, material commercial/legal information, the next matter, and the next follow-up date.
 
 ## Operating Boundaries
 
-- Do not hardcode the CRM workbook path. The user or runtime environment must provide it.
-- Do not hardcode contract-file root folders. The user or runtime environment must provide them. Example paths may be mentioned only as examples, not defaults.
-- Do not include or assume a specific email access method. Use the runtime's approved mailbox skill or tool when available.
-- Draft first and send only after user confirmation unless the active mailbox tool has a stricter approval rule.
-- Do not add scripts, automations, or transport-specific logic to this workflow skill.
-- Do not expose internal tool details in user-facing responses unless the user asks.
-- Respect the runtime's file-write and email-send approval mode. If a CRM update, file write, or email send requires user approval, ask for approval rather than bypassing safety controls.
-
-### Primary CRM Storage
-
-- The Feishu spreadsheet designated by Tian is the live CRM and the only place for normal CRM updates.
-- The current live CRM URL is `https://xian-video.feishu.cn/sheets/RZYVsi2KehwvZNt2By8c1Cmpn1g?sheet=c024c3`.
-- Use the configured Feishu Sheets Open API client or connector as the only normal read/write path for the live CRM.
-- Never write CRM data through browser automation or Computer Use. If the API/connector is unavailable, stop and report the blocked update instead of switching to a visible browser or local workbook. Browser or Computer Use requires Tian's explicit permission before any CRM write.
-- After an API write succeeds, read the exact edited range back through the API and verify the returned values before reporting completion.
-- The local Excel workbook is an offline backup only. Do not update it as a substitute for a Feishu write, and do not report a local copy as the live CRM.
-- If Feishu is unavailable or the user is not authenticated, report the blocked live update and do not silently redirect the write to a local workbook.
+- Use only the live Feishu spreadsheet configured by Tian for normal CRM reads and writes.
+- Use the configured Feishu Sheets Open API client or connector. Never use browser automation or Computer Use for CRM writes without Tian's explicit permission.
+- After every API write, read the exact edited range back and verify it before reporting completion.
+- Treat local Excel files as offline backups only. Never substitute a local workbook for a failed live Feishu write.
+- Do not hardcode workbook paths, attachment folders, or email transport methods in this workflow skill.
+- Use the active approved mailbox skill for email. Draft first and send only after the mailbox confirmation flow is complete.
 
 ### CRM Target Guard
 
-Before any CRM write:
+Before writing:
 
-1. Check for `.codex/film-acquisition-crm.json` in the active project and then in the user's home directory.
-2. If either file declares a `primary_crm` Feishu sheet, treat that sheet as authoritative for normal updates.
-3. If both config files exist, they must agree on the primary Feishu sheet and the offline backup path. If they conflict, abort and report the conflict.
-4. If no primary Feishu sheet is configured, obtain the approved CRM target from Tian or the active runtime context.
-5. Resolve and report the target before editing.
-6. Verify the expected core sheet names and header rows.
-7. Distinguish the live CRM from backups, exports, temporary files, downloaded copies, and files under generic `output` or `outputs` folders.
+1. Read `.codex/film-acquisition-crm.json` in the active project and then in the user home directory.
+2. If both exist, require them to agree on the primary spreadsheet and sheet IDs.
+3. Confirm that the live workbook contains exactly the core tabs `Clients`, `Projects`, and `Contracts`.
+4. Read and map the header row by name. Never hand-count columns or overwrite an unchecked positional row.
+5. Stop and report any target, tab, or header mismatch.
 
-Do not infer that a workbook is authoritative because its filename matches, it is the newest copy, or it is inside the current workspace. If Feishu is configured as primary, never update a local workbook as a substitute and never report a derived copy as the updated CRM.
+## Core Model
 
-When a local workbook is explicitly used for backup or inspection, compare it with the configured `offline_backup_workbook` and report that it is a backup operation, not a live CRM update.
+The CRM has exactly three tabs:
 
-When `allow_derived_workbook_writes` is `false`:
+1. `Clients`
+2. `Projects`
+3. `Contracts`
 
-- Do not leave an updated CRM in `output`, `outputs`, `tmp`, a drafts folder, or another same-name workbook.
-- A transient working file is allowed only when required by the spreadsheet tool. It is never authoritative and must not be presented as the updated CRM.
-- After validation, confirm that the completed write was applied to the canonical workbook path.
-
-## CRM Dimensions
-
-The workbook has four core tabs: `Prospects`, `Clients`, `Projects`, and `Contracts`.
-
-### Prospects
-
-`Prospects` is the outreach pool for companies and contacts that have not yet become active CRM clients. It may contain hundreds of contacts across multiple countries.
-
-Recommended fields:
-
-- `Name`
-- `Country`
-- `Address`
-- `Zip`
-- `City`
-- `State`
-- `Tel`
-- `Fax`
-- `Activities`
-- `Emails`
-- `状态`
-
-Use only these prospect statuses:
-
-- `待联系`: no confirmed outreach has been sent.
-- `已发送待回复`: outreach was confirmed sent and there is no meaningful human reply yet. Automatic replies remain here when the contact may still be active.
-- `有效回复待处理`: a human reply shows real business interest or provides actionable acquisition context, but promotion has not yet been completed.
-- `已转Clients`: the company has been created in or matched to `Clients`.
-- `暂无需求`: a real person replied that there is no current need, but the relationship may be revisited.
-- `退信/邮箱无效`: delivery failed or the address is invalid.
-- `不再联系`: the contact opted out or Tian decided to stop outreach.
-
-Promotion rules:
-
-- Do not create a `Clients` row merely because an outreach email was sent.
-- Automatic replies, out-of-office messages, delivery notices, and silence are not meaningful replies.
-- A meaningful human reply includes interest, a catalogue or title offer, a screener or link offer, a request for more information, or another concrete business response.
-- On a meaningful human reply, create or update the matching `Clients` row, then keep the original prospect row and set `状态 = 已转Clients`.
-- Before promotion, search `Clients` by company, domain, and contact email. Update an existing client instead of creating a duplicate.
-- Do not create a `Projects` row until a specific title or package discussion begins.
-- Record bounces and corrected addresses in `Prospects`; do not promote an invalid address to `Clients`.
+There is no `Prospects` tab and no bulk-outreach contact tab in the CRM. Uncontacted mailing-list contacts remain outside the CRM. Add a company to `Clients` only after meaningful contact is established or Tian explicitly asks.
 
 ### Clients
 
-Client-level records describe companies and contacts.
+`Clients` contains established contacts, relationship-maintenance matters, lineup requests, and specific film/package matters that have not yet been promoted into `Projects`.
 
-Use `Clients` for:
+One row represents one independently followed matter. The same `客户ID` may appear on multiple rows when the client has multiple matters or follow-up dates.
 
-- Company and contact information.
-- Overall relationship context.
-- Current open topics with that contact.
-- Relationship-maintenance and lineup-request follow-up.
+Required columns:
 
-Client records can be created from:
+1. `客户ID`
+2. `公司名`
+3. `业务对接人`
+4. `业务对接人邮箱`
+5. `地区/国家`
+6. `上次跟进日期`
+7. `下次跟进日期`
+8. `跟进事项`
+9. `备注`
 
-- User-provided company, contact, and communication details.
-- A newsletter or email from a new contact when the user asks to add that contact.
-- A `Prospects` row after a meaningful human reply, following the promotion rules above.
+Rules:
 
-When creating a new client from email, search available inbox and sent-mail context for the same company or domain if the runtime supports it. Add any other active acquisition, project, or contract matters found for that client so related work is not split across hidden threads.
+- Keep `跟进事项` free-form and concise. It may be relationship maintenance, a lineup request, a title, or a package.
+- Use a separate row when the same client has another matter with a different follow-up date.
+- Reuse the same `客户ID` for all rows belonging to the same company.
+- Match a Clients row by `客户ID + 跟进事项`; do not overwrite another matter belonging to the same client.
+- When the main contact changes, update all relevant active rows for that client so repeated contact details remain consistent.
+- Put flexible background, secondary contacts, title history, lineup metadata, and non-actionable context in `备注`.
+- An active client matter should normally have a next follow-up date. A blank date is allowed only when there is genuinely no active reminder; never invent a date.
 
-If one company has multiple contacts, keep the client record compact:
+### Promoting A Client Matter To Projects
 
-- Put only the main business contact in `业务对接人`.
-- Put only that person's email in `业务对接人邮箱`.
-- Put legal, finance, material, and notification-only contacts in `备注`.
-- In `Projects`, record the main business contact.
-- In `Contracts`, record the contacts responsible for the current contract workflow.
+Promote a specific Clients matter when it becomes a tracked acquisition project. Examples include a title or package entering evaluation, price discussion, offer preparation, or negotiation.
 
-Recommended fields:
+Use this atomic order:
 
-- `客户ID`
-- `公司名`
-- `业务对接人`
-- `业务对接人邮箱`
-- `地区/国家`
-- `上次收到片单日期`
-- `片单状态`
-- `上次联系日期`
-- `在谈事宜`
-- `下次跟进日期`
-- `备注`
+1. Create a new Projects row and assign a new `项目ID`.
+2. Copy the `客户ID`, company, relevant business contact, and title/package.
+3. Set the project follow-up matter and date.
+4. Read the new Projects row back and verify it.
+5. Delete only the corresponding Clients matter row.
 
-Use `上次收到片单日期` and `片单状态` to track lineup health. Suggested `片单状态` values:
-
-- `有片单`
-- `待要片单`
-- `片单过期`
-- `不适用`
+Do not write `已转Projects` in Clients and do not retain a duplicate Clients row for the same matter. Never delete unrelated rows that share the same `客户ID`.
 
 ### Projects
 
-Project-level records describe acquisition opportunities.
+`Projects` contains tracked acquisition projects, including:
 
-A project may be:
+- Projects ready for evaluation.
+- Projects in negotiation.
+- Projects waiting for a screener, rights window, price information, or a distant future date after they have already been promoted.
 
-- A single film.
-- A package of films.
-- A potential acquisition lead before the right customer is known.
+Once a matter enters `Projects`, keep it there until it is closed or converted into a contract. Do not move it back to Clients merely because it becomes immature, delayed, or long-term.
 
-Project records can be created from:
+Required columns:
 
-- User instructions.
-- Email context where a specific title or package is mentioned and the user asks to track it.
-- A project-first workflow where Tian wants to identify or contact the right seller later.
+1. `项目ID`
+2. `客户ID`
+3. `公司名`
+4. `业务对接人`
+5. `片名或片包名`
+6. `上次跟进日期`
+7. `下次跟进日期`
+8. `跟进事项`
+9. `备注`
 
-Most projects should have a `客户ID`. In rare project-first cases, allow a temporary value such as `待匹配客户` until a client is identified.
+Rules:
 
-Recommended fields:
-
-- `项目ID`
-- `客户ID`
-- `公司名`
-- `业务对接人`
-- `片名或片包名`
-- `项目状态`
-- `上次跟进日期`
-- `上次跟进内容`
-- `下一步动作`
-- `下次跟进日期`
-- `备注`
+- Keep `公司名` and `业务对接人` for direct readability and reliable email preparation even though `客户ID` links back to Clients.
+- There is no project-status column.
+- Put evaluation stage, negotiation status, offers, rights, price, risks, history, and other flexible facts in `备注`.
+- Use `跟进事项` for the next action, question, or decision, not the full previous email history.
+- `下次跟进日期` must never be blank.
+- Use `YYYY-MM-DD` for active projects, including long-term reminders.
+- Use `关闭` when the project will no longer be pursued.
+- Use `已转合同` after the project is converted into Contracts.
 
 ### Contracts
 
-Contract-level records begin after the project has crossed from opportunity into deal execution.
+Contracts begin after both sides confirm the core commercial terms, such as price, rights, territory, and license term. A contract must have both a `客户ID` and a `项目ID`.
 
-Create a contract record when both sides have confirmed the core commercial terms, such as price, rights, territory, and license term. A contract record must always have both a `客户ID` and a `项目ID`.
+Keep the current Contracts structure until Tian completes the separate contract-workflow redesign:
 
-Use `Contracts` for:
+1. `合同ID`
+2. `客户ID`
+3. `项目ID`
+4. `公司名`
+5. `业务对接人`
+6. `合同/项目名称`
+7. `合同状态`
+8. `合同文件`
+9. `付款进度`
+10. `版权文件`
+11. `介质/物料`
+12. `上次跟进日期`
+13. `上次跟进内容`
+14. `下一步动作`
+15. `下次跟进日期`
+16. `备注`
 
-- Contract-detail negotiation.
-- Drafting and signature follow-up.
-- Payment follow-up.
-- Copyright documents.
-- Delivery materials.
-- Any post-deal execution matter.
+Use Contracts for contract drafting/signature, invoices and payment, copyright documents, materials, censorship-related delivery, and other post-deal execution.
 
-Recommended fields:
+When converting a project:
 
-- `合同ID`
-- `客户ID`
-- `项目ID`
-- `公司名`
-- `业务对接人`
-- `合同/项目名称`
-- `合同状态`
-- `合同文件`
-- `付款进度`
-- `版权文件`
-- `介质/物料`
-- `上次跟进日期`
-- `上次跟进内容`
-- `下一步动作`
-- `下次跟进日期`
-- `备注`
+1. Create and verify the Contracts row.
+2. Keep the Projects row for history.
+3. Set `Projects.下次跟进日期 = 已转合同`.
+4. Put future execution follow-up only in Contracts.
 
-Use four execution overview fields rather than one column per micro-step:
+For `Contracts.下次跟进日期`, use `YYYY-MM-DD` while active, `完结` after successful completion, and `关闭` if terminated.
 
-- `合同文件`: contract terms, signing, and fully signed agreement status.
-- `付款进度`: invoice, first payment, censorship-dependent balance payment, and payment status.
-- `版权文件`: draft, signed version, notarized/legalized version, and related copyright document status.
-- `介质/物料`: master, subtitles, poster, stills, trailer, and other delivery materials.
+## Follow-Up Ownership
 
-Suggested compact values:
+One matter has one active follow-up owner:
 
-- `合同文件`: `条款确认中`, `待对方签署`, `已收双方签字版`.
-- `付款进度`: `待发票`, `首款待付`, `首款已付`, `尾款待过审`, `尾款已付`.
-- `版权文件`: `待起草`, `待对方签署`, `已收签字版`, `待公证版`, `已收公证版`.
-- `介质/物料`: `未开始`, `待对方提供`, `已收`, `缺字幕`, `缺海报`.
+1. Contracts owns post-deal execution.
+2. Projects owns a promoted acquisition project.
+3. Clients owns a relationship matter, lineup request, or specific matter not yet promoted.
 
-When a project becomes a contract:
+Different matters for the same company may have different dates in different rows or tabs.
 
-- Add a new row in `Contracts`.
-- Keep the original row in `Projects`.
-- Mark the project status as `已转合同`.
-- Write `已转合同` in the project's `下次跟进日期` column.
-- Move future execution follow-up to `Contracts`.
+Do not duplicate the same matter:
 
-After conversion, `Contracts` controls execution follow-up dates. `Clients` controls only relationship-level follow-up, such as seasonal check-ins or broader catalogue conversations, and does not need to mirror the contract follow-up date.
+- On Clients-to-Projects promotion, verify Projects and delete the matching Clients row.
+- On Projects-to-Contracts conversion, keep Projects only as history with the terminal marker `已转合同`; Contracts owns the active date.
 
-### Auxiliary Sheets
+## Evidence-First Updates
 
-The evaluation-sharing sheet and the contract-review/reporting sheet are auxiliary work surfaces, not primary CRM tabs.
+Use this order for email-driven work:
 
-- Do not automatically copy Projects into the evaluation sheet when a project becomes `待评估`.
-- Do not automatically copy Contracts into the contract-review sheet when a contract is created or updated.
-- Read or write either auxiliary sheet only when Tian explicitly requests that specific operation.
-- A project or contract can remain correctly recorded in the primary CRM without being present in an auxiliary sheet.
-
-## Status Vocabulary
-
-Use fixed status terms plus concise notes. Prefer stable statuses for filtering and reminders, then put details in `备注`.
-
-Prospect statuses are defined in the `Prospects` section and must not be replaced with free-form synonyms.
-
-Project statuses:
-
-- `暂缓`
-- `关闭`
-- `待评估`
-- `谈判`
-- `已转合同`
-
-Contract statuses:
-
-- `合同条款谈判`
-- `等待签署`
-- `等待发票`
-- `等待首款`
-- `等待版权文件`
-- `等待过审`
-- `等待尾款`
-- `等待公证版权文件`
-- `等待介质/物料`
-- `完成`
-- `暂缓`
-- `关闭`
-
-If none of these fits, use the closest status and explain the nuance in `备注`.
-
-## Update Rules
-
-When the user provides a new email, reply, or instruction:
-
-1. Identify the relevant prospect, client, project, or contract.
-2. Update an existing record when possible; do not create duplicates.
-3. Create a new prospect, client, project, or contract only when the user asks or the workflow clearly requires it.
-4. Keep the workbook lightweight. Put complex terms, rights, pricing, tax, payment structure, delivery details, risks, censorship concerns, and replacement mechanisms into `备注` instead of creating many new columns.
-5. Store active date fields as plain text in `YYYY-MM-DD` format, such as `2026-06-16`. For `Projects.下次跟进日期`, `关闭` or `已转合同` is also valid. For `Contracts.下次跟进日期`, `完结` is for successful completion and `关闭` is for a terminated or abandoned matter. Do not write spreadsheet date objects or datetime objects, because they may render as serial numbers, include unwanted time suffixes, or display as `######`.
-6. Before appending rows, ignore or compact fully empty rows so new records are added directly after the last row with real data, not after preformatted blank rows.
-7. Do not record external contract numbers as CRM identifiers. Use the CRM's own `合同ID` as the unique contract identifier. External contract numbers can remain in filenames or contract folders unless Tian explicitly asks to record them.
-
-### Evidence-First Transaction Rules
-
-Cross-system work must follow the actual evidence order:
-
-1. Read and identify the source email or user instruction.
-2. If an attachment matters, confirm its name and type, save it to the explicitly approved destination, and verify the saved path and size.
+1. Read the exact source email or Tian's instruction.
+2. Save and verify explicitly requested attachments.
 3. Draft the outbound email and obtain the mailbox tool's required confirmation.
-4. Send once, then verify Sent or obtain Tian's explicit confirmation of delivery.
-5. Only then write the resulting facts and dates to the canonical CRM workbook.
+4. Send once and verify Sent, or obtain Tian's explicit confirmation of delivery.
+5. Update the correct CRM row with verified facts.
 
-Do not pre-commit future states. Use precise intermediate states when a workflow is incomplete:
+Do not pre-commit future states:
 
-- Attachment listed in email but not saved: `邮件已收到附件，待归档`.
-- Attachment saved and verified: `已归档` plus the relevant document description.
-- Draft prepared but not sent: `待我方发送`.
-- Send confirmation requested but not completed: `待确认发送`.
-- SMTP result uncertain: `发送状态待核验`; do not advance the last-contact date.
-- Sent verified: record the actual sending date and next action.
+- Draft only: write `待我方发送` only if Tian requests a CRM update before sending.
+- Ambiguous send result: do not advance the last-follow-up date; verify Sent first.
+- Attachment mentioned but not saved: do not record it as archived.
+- Send verified: update the actual send date, next matter, and next follow-up date.
 
-For contract documents, do not write `已归档双方签字版` merely because the email says a signed copy is attached. Require the attachment to be saved and verified first. If a step is blocked, report the last verified state and leave later CRM states unchanged unless Tian explicitly asks to record that partial state.
+## Spreadsheet Write Rules
 
-Before every CRM write, run this preflight checklist:
+Expected 0-based header order:
 
-1. If the matter has a contract, write the follow-up date only in `Contracts`.
-2. If a project has moved to `Contracts`, `Projects.项目状态` must be `已转合同` and `Projects.下次跟进日期` must contain the terminal marker `已转合同`.
-3. `Clients.下次跟进日期` is only for independent client-level matters, such as relationship maintenance, lineup requests, or other client-level topics. Do not copy project or contract follow-up dates into `Clients`.
-4. `Projects.下次跟进日期` and `Contracts.下次跟进日期` must never be blank. Use an ISO date while the matter is active; use an approved terminal marker when the matter is closed, converted, or completed. If an existing row is blank, stop and ask Tian for the date or terminal state; never invent one.
-
-These checks are by matter, not by client. One client may have separate active follow-up dates for different matters across `Contracts`, `Projects`, and `Clients`, as long as the same matter is not duplicated across sheets.
-
-If the user only asks for an email draft:
-
-- Do not mark anything as sent.
-- If updating is appropriate, mark the next action as `待我方发送` or equivalent.
-
-If the user says the email was sent:
-
-- First verify the message in Sent mail or receive an explicit confirmation from Tian that it was sent.
-- Only after confirmation, update the correct owner row as one atomic CRM action: set `上次联系日期` or `上次跟进日期` to the actual sending date, summarize what was sent, set the next action, and set a reasonable `下次跟进日期`.
-- If sending is uncertain, do not mark the CRM as sent or advance the last-contact date.
-- For bulk prospect outreach, update each confirmed recipient to `已发送待回复`; do not create individual `Clients` or `Projects` rows until the promotion rules are met.
-
-## Spreadsheet Presentation Rules
-
-Keep the workbook visually usable after edits.
-
-- Use plain text `YYYY-MM-DD` for active follow-up and contact dates. In the Projects and Contracts next-follow-up columns, use only the approved terminal markers when a row is no longer active.
-- Remove or ignore fully empty rows before appending new data.
-- Adjust obvious narrow columns when the runtime supports it, especially date and long-note fields.
-
-## Header-Driven Spreadsheet Write Rules
-
-Before modifying any live Feishu sheet, read and confirm the header row through the API. Write cells by mapping header names to columns. Do not hand-count columns, and do not overwrite a full row with an unchecked positional array. Apply the same mapping rule to an offline backup only when Tian explicitly requests a backup operation.
-
-Expected 0-based header order for validation:
-
-- `Prospects`: `0=Name`, `1=Country`, `2=Address`, `3=Zip`, `4=City`, `5=State`, `6=Tel`, `7=Fax`, `8=Activities`, `9=Emails`, `10=状态`.
-- `Clients`: `0=客户ID`, `1=公司名`, `2=业务对接人`, `3=业务对接人邮箱`, `4=地区/国家`, `5=上次收到片单日期`, `6=片单状态`, `7=上次联系日期`, `8=在谈事宜`, `9=下次跟进日期`, `10=备注`.
-- `Projects`: `0=项目ID`, `1=客户ID`, `2=公司名`, `3=业务对接人`, `4=片名或片包名`, `5=项目状态`, `6=上次跟进日期`, `7=上次跟进内容`, `8=下一步动作`, `9=下次跟进日期`, `10=备注`.
+- `Clients`: `0=客户ID`, `1=公司名`, `2=业务对接人`, `3=业务对接人邮箱`, `4=地区/国家`, `5=上次跟进日期`, `6=下次跟进日期`, `7=跟进事项`, `8=备注`.
+- `Projects`: `0=项目ID`, `1=客户ID`, `2=公司名`, `3=业务对接人`, `4=片名或片包名`, `5=上次跟进日期`, `6=下次跟进日期`, `7=跟进事项`, `8=备注`.
 - `Contracts`: `0=合同ID`, `1=客户ID`, `2=项目ID`, `3=公司名`, `4=业务对接人`, `5=合同/项目名称`, `6=合同状态`, `7=合同文件`, `8=付款进度`, `9=版权文件`, `10=介质/物料`, `11=上次跟进日期`, `12=上次跟进内容`, `13=下一步动作`, `14=下次跟进日期`, `15=备注`.
 
-After every spreadsheet write, scan the edited rows and any related project or contract rows:
+After every write:
 
-- `Prospects.状态` must use the fixed vocabulary above. A row marked `已转Clients` must have a matching `Clients` record.
-- Active date fields must be plain text in `YYYY-MM-DD` format. `Projects.下次跟进日期` may also be `关闭` or `已转合同`; `Contracts.下次跟进日期` may also be `完结` or `关闭`.
-- `上次跟进内容` must not contain only a date.
-- `下一步动作` must contain an action or owner, not the previous follow-up summary.
-- `下次跟进日期` must contain an ISO date or an approved terminal marker. It must not contain arbitrary action text. Projects and Contracts must not be blank in this column.
-- Follow-up ownership must satisfy the CRM write preflight checklist above.
-
-Reference column widths:
-
-- `Prospects`: `Name` 32, `Country` 14, `Address` 45, `Activities` 46, `Emails` 38, `状态` 18.
-- `Clients`: `客户ID` 12, `公司名` 24, `业务对接人` 22, `业务对接人邮箱` 32, `上次收到片单日期` 16, `片单状态` 14, `在谈事宜` 55, `下次跟进日期` 16.
-- `Projects`: `片名或片包名` 35, `上次跟进内容` 55, `备注` 50.
-- `Contracts`: `合同/项目名称` 35, `合同文件` 24, `付款进度` 24, `版权文件` 24, `介质/物料` 24, `上次跟进内容` 40, `备注` 40.
-
-## Follow-Up Date Rules
-
-The three action dimensions revolve around `下次跟进日期`, but the date means different things by dimension:
-
-- `Clients`: relationship maintenance, lineup requests, and other independent client-level matters.
-- `Projects`: active acquisition opportunity follow-up before core commercial terms are confirmed.
-- `Contracts`: execution follow-up after core commercial terms are confirmed.
-
-Follow-up ownership is exclusive. One matter must have only one follow-up date source:
-
-1. `Contracts` overrides `Projects` and `Clients`.
-2. `Projects` overrides `Clients`.
-3. `Clients` follow-up dates are only for independent client-level matters, not copies of project or contract follow-up.
-
-When updating a contract matter, update only the `Contracts` follow-up date. Do not copy the same date into the related `Projects` or `Clients` rows.
-
-When updating an active project matter that has not moved to `Contracts`, update only the `Projects` follow-up date. Do not copy the same date into `Clients`.
-
-When updating client relationship maintenance, lineup requests, or another client-level topic, update `Clients` even if the same client has an active project or contract, provided it is genuinely a different matter. Never duplicate a project or contract reminder in `Clients`.
-
-### Terminal Follow-Up Markers
-
-`Projects` and `Contracts` require an explicit terminal value instead of a blank next-follow-up cell:
-
-- Active Project: `YYYY-MM-DD`.
-- Project converted into a Contract: write `已转合同` in `Projects.下次跟进日期` and set `Projects.项目状态 = 已转合同`. The active execution follow-up remains owned by `Contracts`.
-- Project abandoned or otherwise closed: write `关闭` in `Projects.下次跟进日期` and set the corresponding project status to `关闭`.
-- Active Contract: `YYYY-MM-DD`.
-- Contract fully completed: write `完结` in `Contracts.下次跟进日期` and keep the corresponding contract status as `完成`.
-- Contract terminated or abandoned: write `关闭` in `Contracts.下次跟进日期` and keep the corresponding contract status as `关闭`.
-
-These markers are workflow values, not calendar dates. Do not place them in `上次跟进日期`, `上次联系日期`, or unrelated date columns. When reviewing or migrating existing rows, replace a blank Projects or Contracts next-follow-up cell with the appropriate marker only after confirming the row's terminal status.
-
-If duplicate follow-up dates for the same matter are found across sheets, keep the highest-priority owner and clear the lower-priority duplicates:
-
-- Keep `Contracts`; clear related `Projects` and `Clients`.
-- If no `Contracts`, keep `Projects`; clear related `Clients`.
-- Keep `Clients` only for standalone relationship maintenance or lineup requests.
-
-Default timing:
-
-- Formal offer: follow up in 3-5 business days.
-- Gentle reminder: follow up in 2-3 business days.
-- Counterparty needs internal confirmation: follow up in 3-5 business days.
-- Contract, payment, materials, or copyright documents: follow up in 2-5 business days depending on urgency.
-
-If the next action is internal review, set the date for when Tian should make that decision, not when the counterparty should reply.
-
-If the next action is waiting for the counterparty, set the date for when Tian should consider sending a reminder.
-
-After any CRM write, verify that follow-up ownership is not violated. If a project has moved to `Contracts`, the original `Projects` row must remain for history, have `项目状态 = 已转合同`, and have `下次跟进日期 = 已转合同`. If a project is closed, use `下次跟进日期 = 关闭`. If a contract is complete, use `下次跟进日期 = 完结`; if a contract is terminated, use `下次跟进日期 = 关闭`.
+- Verify the exact edited range through the API.
+- Verify IDs, company, contact, matter, and date remained under the correct headers.
+- Require plain-text `YYYY-MM-DD` for active dates.
+- Reject serial numbers, datetimes, `######`, or action text in date fields.
+- Require Projects and Contracts next-follow-up cells to contain a date or approved terminal marker.
+- Verify the same matter is not active in multiple tabs.
 
 ## Daily Follow-Up Check
 
-When Tian asks what needs follow-up today:
+When Tian asks what is due:
 
-1. Check `Prospects`, `Clients`, `Projects`, and `Contracts`.
-2. Include all `Prospects` rows with `状态 = 有效回复待处理`, plus dated records where `下次跟进日期 <= today`.
-3. Group results into:
+1. Read Clients, Projects, and Contracts.
+2. Include active dated rows where `下次跟进日期 <= today`.
+3. Ignore `关闭`, `已转合同`, and `完结` as active reminders.
+4. Group results into:
    - `需要主动发邮件`
    - `需要内部判断`
    - `等待对方但到期可催`
    - `暂不用跟进`
-4. Explain each item with the contact, title or contract, why it is due, and the suggested next step.
+5. Identify the company, matter/project/contract, reason due, and suggested next action.
 
-Keep client relationship-maintenance reminders separate from active project or contract follow-ups. Keep the answer concise. Mention future non-due items only if they are important context.
+## Auxiliary Sheets
 
-## Email Drafting Rules
+The evaluation-sharing sheet and contract-review/reporting sheet are separate work surfaces, not CRM tabs.
 
-English acquisition emails should be:
+- Do not automatically copy Projects or Contracts into them.
+- Read or write an auxiliary sheet only when Tian explicitly requests that specific operation.
 
-- Short.
-- Clear.
-- Natural.
-- Commercially specific.
-- Polite but not weak.
+## Email Drafting
 
-Common patterns:
+English acquisition emails should be short, natural, polite, and commercially specific.
 
-- `Thanks for your reply.`
-- `Just wanted to follow up on...`
-- `Would it be possible for you to check...`
-- `Please kindly let me know...`
-- `If this structure works for you, we can then discuss the remaining contract details.`
+When preparing a send:
 
-When Tian asks for text that can be copied and sent:
-
-- Do not include a subject line.
-- Do not include Chinese explanation.
-- Output only the email body.
-- End with:
-
-```text
-Best,
-Tian
-```
-
-When an approved mailbox tool can send email:
-
-- Draft first.
-- Ask for or require user confirmation before sending.
-- Extract recipient addresses from the original email's `From` or `Reply-To` fields when replying. Do not infer domains or addresses from memory.
-- If one user instruction involves multiple recipients or multiple separate emails, show each draft separately and require confirmation for each one before sending.
-- After confirmed and verified sending, update the canonical CRM workbook with the actual send date and next follow-up date.
-
-### Email Sending Safety Rules
-
-When sending through any approved script-driven mail tool:
-
-- Use a send timeout of at least 60 seconds.
-- If the command times out, the terminal disconnects, or there is no explicit SMTP failure message, do not retry immediately.
-- Before any retry, check Sent mail for a message with the same recipient, same subject, close send time, and substantially similar body.
-- If the message may have been sent but cannot be confirmed, report the uncertainty to Tian and ask before sending again.
-
-### Reply Thread Rules
-
-Replies to existing matters must stay in the original email thread by default. Do not create a new thread unless Tian explicitly asks or no thread context is available and Tian confirms sending anyway.
-
-When sending a reply:
-
-1. Prefer the current original email's `Message-ID`, `References`, subject, sender, date, and body.
-2. If the current original email is not available, search the inbox for the latest relevant email from the counterparty and use its `Message-ID`.
-3. If the inbox has no relevant counterparty email, search Sent mail for Tian's latest relevant message to that counterparty and use its `Message-ID`.
-4. Set `In-Reply-To` to the found `Message-ID`.
-5. Set `References` to the prior `References` plus the found `Message-ID` when available; otherwise use the found `Message-ID`.
-6. Preserve the original subject, including `Re:` when appropriate.
-7. Include quoted context at the bottom of the body:
-
-```text
-On [date], [name] <[email]> wrote:
-> [quoted original text]
-```
-
-If no usable `Message-ID` or original text can be found, tell Tian that the reply cannot be safely threaded and ask whether to send a new-thread email.
-
-When Codex cannot send email:
-
-- Draft the message for Tian to copy.
-- Update the CRM as sent only after Tian confirms it has been sent.
+- Use the approved Feishu work-mail tool and sender `tianyuan@osvideo.net`.
+- Reply in the original thread and reply-all by default.
+- Show Tian the complete proposed body before requesting confirmation.
+- Never mark the CRM as sent until delivery is verified.
+- After a verified send, apply the requested CRM update or show the exact proposed update.
 
 ## Decision Defaults
 
-- Prefer updating existing records over creating new ones.
-- Prefer concise summaries over full email copies.
-- Prefer notes in `备注` over new columns.
-- Keep unresponsive outreach leads in `Prospects`; promote only meaningful human replies to `Clients`.
-- Keep signed or executing deals in `Contracts`, not active acquisition `Projects`.
-- Keep `Clients` focused on business contacts, lineup status, relationship maintenance, and overall open topics.
-- Keep `Projects` focused on active acquisition opportunities before confirmed core commercial terms.
-- Keep `Contracts` focused on contract files, payment, copyright documents, and materials.
-- Treat the latest email and the CRM workbook as source of truth.
-- Ask Tian when a decision would materially change whether a record is created, moved to contracts, or closed.
+- Prefer updating an existing row over creating a duplicate.
+- Prefer concise action text over full email copies.
+- Put flexible history and commercial detail in `备注`.
+- Keep bulk outreach outside the CRM.
+- Use Clients for one row per client matter.
+- Keep promoted projects in Projects even when follow-up is far in the future.
+- Keep executing deals in Contracts.
+- Ask Tian only when a decision would materially change which matter is created, deleted, closed, or converted.
