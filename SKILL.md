@@ -5,7 +5,7 @@ description: "Maintain Tian's film acquisition CRM across Clients, Projects, and
 
 # Film Acquisition CRM
 
-Version: `1.6.1`
+Version: `1.6.2`
 
 The CRM is a compact action system. It should answer:
 
@@ -153,7 +153,7 @@ Required columns:
 Allowed checkpoint values:
 
 - `双签合同电子版`: `有` or `无`.
-- `版权文件`: `未起草`, `已起草`, or `已签字`.
+- `版权文件`: `有` or `无`.
 - `首款`, `尾款`, and `介质及公证费`: `无发票`, `有发票未付`, `已付`, or `不适用`.
 - `报审进度`: `待报审`, `报审中`, `报审完成`, or `无需报审`.
 - `海牙公证文件`: `有` or `无`.
@@ -164,7 +164,7 @@ The checkpoint columns contain only these exact values. Put negotiation detail, 
 Use these evidence meanings:
 
 - `双签合同电子版 = 有` only after the fully signed electronic agreement has been received, identified, and archived.
-- `版权文件 = 已起草` only after all required drafts exist and are archived. Use `已签字` only after every required copyright document, such as the LOA and COT, has been signed, received, and archived. If only some documents are signed, keep `已起草` and list the missing signatures in `跟进事项`.
+- `版权文件 = 有` only after all required drafts, such as the LOA and COT, exist and are archived. This field records that the documents have been drafted; it does not mean that they have been signed, apostilled, or fully received. Record signature, return, version, and missing-document details in `跟进事项` or `备注`.
 - An invoice changes a payment checkpoint only to `有发票未付`. Change it to `已付` only with Tian's confirmation, payment evidence, or another explicit verified source.
 - Use `不适用` only when verified contract terms confirm that the payment category does not apply.
 - `海牙公证文件 = 有` only after every required valid final apostilled document has been received and archived. An accepted electronic apostille may count when appropriate for the deal.
@@ -178,7 +178,7 @@ Derive the next action from objective checkpoints rather than maintaining a sepa
 1. If `双签合同电子版 = 无`, continue contract-detail negotiation or collect the missing signature; record the exact situation in `备注`.
 2. Once the agreement is fully signed, requesting the first-payment invoice and drafting the copyright document may proceed in parallel.
 3. If a payment checkpoint is `无发票`, request the applicable invoice when the deal has reached that payment point.
-4. If `版权文件 = 未起草`, prepare the document from verified contract terms. If it is `已起草`, send it for confirmation and signature when appropriate.
+4. If `版权文件 = 无`, prepare the document from verified contract terms. If it is `有`, send it for confirmation and signature when appropriate, and record the exact outstanding step in `跟进事项`.
 5. For `待报审`, obtain or locate the censorship screener and prepare forms, subtitles, and lab materials. For `报审中`, track the expected decision date without claiming approval. For `报审完成`, move to the applicable final invoice, payment, apostille, and delivery actions.
 6. For `无需报审`, follow the deal's agreed payment and copyright-document sequence without creating censorship tasks.
 7. Request missing delivery items only after the deal's payment, censorship, and document prerequisites for delivery are satisfied.
@@ -252,13 +252,13 @@ When archiving a newly received file:
 
 ### Copyright Document Drafting
 
-When `版权文件 = 未起草` and Tian asks Codex to prepare the documents:
+When `版权文件 = 无` and Tian asks Codex to prepare the documents:
 
 1. Use the fully signed agreement as the controlling source. Use an existing project document or approved precedent only for structure.
 2. Extract and cross-check the picture title, licensor, licensee, territory, term, rights, exclusivity, sublicensing, and any anti-piracy language.
 3. Prepare each required document, normally the LOA and COT, separately. Do not invent missing terms or copy another project's facts.
 4. Save drafts to the configured project folder without overwriting existing versions, then reopen and verify them.
-5. Change `版权文件` to `已起草` only after all required drafts are saved and verified. Sending, signing, and apostille remain later checkpoints.
+5. Change `版权文件` to `有` only after all required drafts are saved and verified. Sending, signing, and apostille remain later checkpoints recorded in the matter, notes, and dedicated apostille checkpoint.
 
 ## Spreadsheet Write Rules
 
@@ -274,9 +274,22 @@ After every write:
 - Verify IDs, company, contact, matter, and date remained under the correct headers.
 - Require plain-text `YYYY-MM-DD` for active dates.
 - Reject serial numbers, datetimes, `######`, or action text in date fields.
-- Require Projects and Contracts next-follow-up cells to contain a date or approved terminal marker.
+- Require Projects and Contracts next-follow-up cells to contain a date or an approved terminal marker. For Projects, approved terminal markers are `关闭` and `已转合同`; for Contracts, they are `关闭` and `完结`. Do not report these markers as malformed dates.
 - Validate every Contracts checkpoint against its exact allowed-value set.
 - Verify the same matter is not active in multiple tabs.
+
+## CRM Health Check
+
+When checking due items or validating a write, scan all three tabs for:
+
+1. Blank `下次跟进日期` cells on active matters.
+2. Active dates earlier than today.
+3. Serial numbers, datetimes, `######`, action text, or unrecognized status text in date cells.
+4. The same active matter appearing in more than one tab.
+5. Projects or Contracts with missing required IDs.
+6. Contracts marked `完结` while applicable payments, copyright/apostille, censorship, or delivery checkpoints are still incomplete.
+
+Treat `关闭`, `已转合同`, and `完结` as valid terminal markers according to the tab rules above. Report health-check findings separately from actual due items, and do not change data during a read-only check unless Tian explicitly asks.
 
 ## Daily Follow-Up Check
 
@@ -291,6 +304,16 @@ When Tian asks what is due:
    - `等待对方但到期可催`
    - `暂不用跟进`
 5. Identify the company, matter/project/contract, reason due, and suggested next action.
+
+## Follow-Up Date Defaults
+
+When Tian does not specify a date, suggest the following defaults; never override an explicit date:
+
+- Routine outreach, lineup requests, sample requests, or offer follow-up: 7 days.
+- Contract, invoice, copyright, apostille, censorship, or delivery matters: 3 to 5 days.
+- Automatic replies: 5 days after the stated return date.
+- Relationship maintenance or general lineup refresh: 30 days.
+- Rights or availability that depend on a known future date: use that actual trigger date rather than inventing a short reminder.
 
 ## Auxiliary Sheets
 
