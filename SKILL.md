@@ -5,16 +5,33 @@ description: "Maintain Tian's film acquisition CRM across Clients, Projects, and
 
 # Film Acquisition CRM
 
-Version: `1.6.2`
+Version: `1.6.3`
 
 The CRM is a compact action system. It should answer:
 
 - Who is involved?
 - What matter, project, or contract needs attention?
 - What is the next action?
-- When should Tian follow up?
+- When does it need attention again?
 
-Email is the source record; CRM is the action summary. Do not copy full emails into CRM. Keep only current follow-up facts, material commercial/legal information, the next matter, and the next follow-up date.
+Email is the source record; CRM is the action summary. Do not copy full emails into CRM. Keep only current action facts, material commercial/legal information, the next action, and the next action date.
+
+`Next action date` is the date when a matter should return to the active queue. It may remind Tian to act, chase a counterparty, check a milestone, or make a decision. It does not necessarily mean that Tian should send an email on that date.
+
+## Action Field Semantics
+
+- `最近处理日期` records the last meaningful internal or external action, such as sending an email, evaluating a title, making a payment, preparing a document, or checking a milestone. A CRM-only edit does not count as handling the matter.
+- `下次行动日期` is the date to revisit the matter. It may represent our own task, a counterparty reminder, or a status check.
+- `下一步行动` states what should happen when the matter returns to the active queue. It is not a copy of the previous email.
+
+Use concise responsibility prefixes when they clarify what happens next:
+
+- `我方：` for Tian's or the internal team's next task.
+- `对方：` for an expected counterparty action or an overdue item that may need chasing.
+- `检查：` for a milestone, availability, censorship, rights-window, or status review.
+- `双方：` for a decision or step that requires both sides.
+
+Combine prefixes for parallel work, for example `对方：发送首款发票；我方：起草版权文件`. Do not add a separate owner or action-type column.
 
 ## Operating Boundaries
 
@@ -52,7 +69,7 @@ There is no `Prospects` tab and no bulk-outreach contact tab in the CRM. Unconta
 
 `Clients` contains established contacts, relationship-maintenance matters, lineup requests, and specific film/package matters that have not yet been promoted into `Projects`.
 
-One row represents one independently followed matter. The same `客户ID` may appear on multiple rows when the client has multiple matters or follow-up dates.
+One row represents one independently tracked matter. The same `客户ID` may appear on multiple rows when the client has multiple matters or action dates.
 
 Required columns:
 
@@ -61,20 +78,20 @@ Required columns:
 3. `业务对接人`
 4. `业务对接人邮箱`
 5. `地区/国家`
-6. `上次跟进日期`
-7. `下次跟进日期`
-8. `跟进事项`
+6. `最近处理日期`
+7. `下次行动日期`
+8. `下一步行动`
 9. `备注`
 
 Rules:
 
-- Keep `跟进事项` free-form and concise. It may be relationship maintenance, a lineup request, a title, or a package.
-- Use a separate row when the same client has another matter with a different follow-up date.
+- Keep `下一步行动` free-form and concise. It may be relationship maintenance, a lineup request, a title, a package, an internal task, or a milestone check.
+- Use a separate row when the same client has another matter with a different action date.
 - Reuse the same `客户ID` for all rows belonging to the same company.
-- Match a Clients row by `客户ID + 跟进事项`; do not overwrite another matter belonging to the same client.
+- Before updating Clients, read every row with the same `客户ID` and identify the exact matter from its current `下一步行动` and `备注`. Do not use the changing action text as a stable key, and do not overwrite another matter belonging to the same client. Ask Tian when the target matter remains ambiguous.
 - When the main contact changes, update all relevant active rows for that client so repeated contact details remain consistent.
 - Put flexible background, secondary contacts, title history, lineup metadata, and non-actionable context in `备注`.
-- An active client matter should normally have a next follow-up date. A blank date is allowed only when there is genuinely no active reminder; never invent a date.
+- An active client matter should normally have a next action date. A blank date is allowed only when there is genuinely no active reminder; never invent a date.
 
 ### Promoting A Client Matter To Projects
 
@@ -84,7 +101,7 @@ Use this atomic order:
 
 1. Create a new Projects row and assign a new `项目ID`.
 2. Copy the `客户ID`, company, relevant business contact, and title/package.
-3. Set the project follow-up matter and date.
+3. Set the project next action and action date.
 4. Read the new Projects row back and verify it.
 5. Delete only the corresponding Clients matter row.
 
@@ -107,9 +124,9 @@ Required columns:
 3. `公司名`
 4. `业务对接人`
 5. `片名或片包名`
-6. `上次跟进日期`
-7. `下次跟进日期`
-8. `跟进事项`
+6. `最近处理日期`
+7. `下次行动日期`
+8. `下一步行动`
 9. `备注`
 
 Rules:
@@ -117,8 +134,8 @@ Rules:
 - Keep `公司名` and `业务对接人` for direct readability and reliable email preparation even though `客户ID` links back to Clients.
 - There is no project-status column.
 - Put evaluation stage, negotiation status, offers, rights, price, risks, history, and other flexible facts in `备注`.
-- Use `跟进事项` for the next action, question, or decision, not the full previous email history.
-- `下次跟进日期` must never be blank.
+- Use `下一步行动` for the next action, question, check, or decision, not the full previous email history.
+- `下次行动日期` must never be blank.
 - Use `YYYY-MM-DD` for active projects, including long-term reminders.
 - Use `关闭` when the project will no longer be pursued.
 - Use `已转合同` after the project is converted into Contracts.
@@ -145,9 +162,9 @@ Required columns:
 12. `报审进度`
 13. `海牙公证文件`
 14. `介质/物料`
-15. `上次跟进日期`
-16. `下次跟进日期`
-17. `跟进事项`
+15. `最近处理日期`
+16. `下次行动日期`
+17. `下一步行动`
 18. `备注`
 
 Allowed checkpoint values:
@@ -159,16 +176,16 @@ Allowed checkpoint values:
 - `海牙公证文件`: `有` or `无`.
 - `介质/物料`: `有` or `无`.
 
-The checkpoint columns contain only these exact values. Put negotiation detail, partial delivery, special payment terms, single-signed contract status, version history, and exceptions in `备注` or the current `跟进事项`.
+The checkpoint columns contain only these exact values. Put negotiation detail, partial delivery, special payment terms, single-signed contract status, version history, and exceptions in `备注` or the current `下一步行动`.
 
 Use these evidence meanings:
 
 - `双签合同电子版 = 有` only after the fully signed electronic agreement has been received, identified, and archived.
-- `版权文件 = 有` only after all required drafts, such as the LOA and COT, exist and are archived. This field records that the documents have been drafted; it does not mean that they have been signed, apostilled, or fully received. Record signature, return, version, and missing-document details in `跟进事项` or `备注`.
+- `版权文件 = 有` only after all required drafts, such as the LOA and COT, exist and are archived. This field records that the documents have been drafted; it does not mean that they have been signed, apostilled, or fully received. Record signature, return, version, and missing-document details in `下一步行动` or `备注`.
 - An invoice changes a payment checkpoint only to `有发票未付`. Change it to `已付` only with Tian's confirmation, payment evidence, or another explicit verified source.
 - Use `不适用` only when verified contract terms confirm that the payment category does not apply.
 - `海牙公证文件 = 有` only after every required valid final apostilled document has been received and archived. An accepted electronic apostille may count when appropriate for the deal.
-- `介质/物料 = 有` only after all required delivery items have been received and verified. Partial delivery remains `无`, with missing items listed in `跟进事项`.
+- `介质/物料 = 有` only after all required delivery items have been received and verified. Partial delivery remains `无`, with missing items listed in `下一步行动`.
 - Never infer censorship approval, payment, or complete delivery merely from a filename, an invoice, or a counterparty promise.
 
 ### Contract Next-Action Inference
@@ -178,28 +195,28 @@ Derive the next action from objective checkpoints rather than maintaining a sepa
 1. If `双签合同电子版 = 无`, continue contract-detail negotiation or collect the missing signature; record the exact situation in `备注`.
 2. Once the agreement is fully signed, requesting the first-payment invoice and drafting the copyright document may proceed in parallel.
 3. If a payment checkpoint is `无发票`, request the applicable invoice when the deal has reached that payment point.
-4. If `版权文件 = 无`, prepare the document from verified contract terms. If it is `有`, send it for confirmation and signature when appropriate, and record the exact outstanding step in `跟进事项`.
+4. If `版权文件 = 无`, prepare the document from verified contract terms. If it is `有`, send it for confirmation and signature when appropriate, and record the exact outstanding step in `下一步行动`.
 5. For `待报审`, obtain or locate the censorship screener and prepare forms, subtitles, and lab materials. For `报审中`, track the expected decision date without claiming approval. For `报审完成`, move to the applicable final invoice, payment, apostille, and delivery actions.
 6. For `无需报审`, follow the deal's agreed payment and copyright-document sequence without creating censorship tasks.
 7. Request missing delivery items only after the deal's payment, censorship, and document prerequisites for delivery are satisfied.
-8. Mark the contract `完结` in `下次跟进日期` only when all applicable payments, censorship, copyright/apostille, and delivery obligations are complete. Use `关闭` only for a terminated contract.
+8. Mark the contract `完结` in `下次行动日期` only when all applicable payments, censorship, copyright/apostille, and delivery obligations are complete. Use `关闭` only for a terminated contract.
 
-When multiple actions are active, keep one contract row and use the earliest actionable follow-up date. Prefix parallel work in `跟进事项`, for example `对方：发送首款发票；我方：起草版权文件`.
+When multiple actions are active, keep one contract row, use the earliest actionable date, and combine responsibility prefixes in `下一步行动`.
 
 When converting a project:
 
 1. Create and verify the Contracts row.
 2. Initialize every checkpoint with an allowed value. Determine `待报审` versus `无需报审` from verified deal requirements; ask Tian when unknown.
-3. Set a nonblank next follow-up date and concise `跟进事项`.
+3. Set a nonblank next action date and concise `下一步行动`.
 4. Keep the Projects row for history.
-5. Set `Projects.下次跟进日期 = 已转合同`.
-6. Put future execution follow-up only in Contracts.
+5. Set `Projects.下次行动日期 = 已转合同`.
+6. Put future execution actions only in Contracts.
 
-For `Contracts.下次跟进日期`, use `YYYY-MM-DD` while active, `完结` after successful completion, and `关闭` if terminated.
+For `Contracts.下次行动日期`, use `YYYY-MM-DD` while active, `完结` after successful completion, and `关闭` if terminated.
 
-## Follow-Up Ownership
+## Action Ownership
 
-One matter has one active follow-up owner:
+One matter has one active action owner:
 
 1. Contracts owns post-deal execution.
 2. Projects owns a promoted acquisition project.
@@ -225,9 +242,9 @@ Use this order for email-driven work:
 Do not pre-commit future states:
 
 - Draft only: write `待我方发送` only if Tian requests a CRM update before sending.
-- Ambiguous send result: do not advance the last-follow-up date; verify Sent first.
+- Ambiguous send result: do not advance the most recent processed date; verify Sent first.
 - Attachment mentioned but not saved: do not record it as archived.
-- Send verified: update the actual send date, next matter, and next follow-up date.
+- Send verified: update the actual send date, next action, and next action date.
 
 ## Contract File Evidence
 
@@ -264,9 +281,9 @@ When `版权文件 = 无` and Tian asks Codex to prepare the documents:
 
 Expected 0-based header order:
 
-- `Clients`: `0=客户ID`, `1=公司名`, `2=业务对接人`, `3=业务对接人邮箱`, `4=地区/国家`, `5=上次跟进日期`, `6=下次跟进日期`, `7=跟进事项`, `8=备注`.
-- `Projects`: `0=项目ID`, `1=客户ID`, `2=公司名`, `3=业务对接人`, `4=片名或片包名`, `5=上次跟进日期`, `6=下次跟进日期`, `7=跟进事项`, `8=备注`.
-- `Contracts`: `0=合同ID`, `1=客户ID`, `2=项目ID`, `3=公司名`, `4=业务对接人`, `5=合同/项目名称`, `6=双签合同电子版`, `7=版权文件`, `8=首款`, `9=尾款`, `10=介质及公证费`, `11=报审进度`, `12=海牙公证文件`, `13=介质/物料`, `14=上次跟进日期`, `15=下次跟进日期`, `16=跟进事项`, `17=备注`.
+- `Clients`: `0=客户ID`, `1=公司名`, `2=业务对接人`, `3=业务对接人邮箱`, `4=地区/国家`, `5=最近处理日期`, `6=下次行动日期`, `7=下一步行动`, `8=备注`.
+- `Projects`: `0=项目ID`, `1=客户ID`, `2=公司名`, `3=业务对接人`, `4=片名或片包名`, `5=最近处理日期`, `6=下次行动日期`, `7=下一步行动`, `8=备注`.
+- `Contracts`: `0=合同ID`, `1=客户ID`, `2=项目ID`, `3=公司名`, `4=业务对接人`, `5=合同/项目名称`, `6=双签合同电子版`, `7=版权文件`, `8=首款`, `9=尾款`, `10=介质及公证费`, `11=报审进度`, `12=海牙公证文件`, `13=介质/物料`, `14=最近处理日期`, `15=下次行动日期`, `16=下一步行动`, `17=备注`.
 
 After every write:
 
@@ -274,7 +291,7 @@ After every write:
 - Verify IDs, company, contact, matter, and date remained under the correct headers.
 - Require plain-text `YYYY-MM-DD` for active dates.
 - Reject serial numbers, datetimes, `######`, or action text in date fields.
-- Require Projects and Contracts next-follow-up cells to contain a date or an approved terminal marker. For Projects, approved terminal markers are `关闭` and `已转合同`; for Contracts, they are `关闭` and `完结`. Do not report these markers as malformed dates.
+- Require Projects and Contracts next-action-date cells to contain a date or an approved terminal marker. For Projects, approved terminal markers are `关闭` and `已转合同`; for Contracts, they are `关闭` and `完结`. Do not report these markers as malformed dates.
 - Validate every Contracts checkpoint against its exact allowed-value set.
 - Verify the same matter is not active in multiple tabs.
 
@@ -282,7 +299,7 @@ After every write:
 
 When checking due items or validating a write, scan all three tabs for:
 
-1. Blank `下次跟进日期` cells on active matters.
+1. Blank `下次行动日期` cells on active matters.
 2. Active dates earlier than today.
 3. Serial numbers, datetimes, `######`, action text, or unrecognized status text in date cells.
 4. The same active matter appearing in more than one tab.
@@ -291,21 +308,22 @@ When checking due items or validating a write, scan all three tabs for:
 
 Treat `关闭`, `已转合同`, and `完结` as valid terminal markers according to the tab rules above. Report health-check findings separately from actual due items, and do not change data during a read-only check unless Tian explicitly asks.
 
-## Daily Follow-Up Check
+## Daily Action Check
 
 When Tian asks what is due:
 
 1. Read Clients, Projects, and Contracts.
-2. Include active dated rows where `下次跟进日期 <= today`.
+2. Include active dated rows where `下次行动日期 <= today`.
 3. Ignore `关闭`, `已转合同`, and `完结` as active reminders.
 4. Group results into:
-   - `需要主动发邮件`
-   - `需要内部判断`
-   - `等待对方但到期可催`
-   - `暂不用跟进`
+   - `需要我方行动`
+   - `等待对方，到期可催`
+   - `到期检查节点`
+   - `需要双方推进`
+   - `暂不用处理`
 5. Identify the company, matter/project/contract, reason due, and suggested next action.
 
-## Follow-Up Date Defaults
+## Action Date Defaults
 
 When Tian does not specify a date, suggest the following defaults; never override an explicit date:
 
@@ -335,7 +353,7 @@ The approved mailbox skill owns sender identity, thread/reply-all behavior, conf
 - Put flexible history and commercial detail in `备注`.
 - Keep bulk outreach outside the CRM.
 - Use Clients for one row per client matter.
-- Keep promoted projects in Projects even when follow-up is far in the future.
+- Keep promoted projects in Projects even when the next action date is far in the future.
 - Keep executing deals in Contracts.
 - Infer contract work from verified checkpoints and file evidence; do not maintain a redundant subjective contract-status field.
 - Ask Tian only when a decision would materially change which matter is created, deleted, closed, or converted.
