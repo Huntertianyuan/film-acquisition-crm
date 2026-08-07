@@ -5,7 +5,7 @@ description: "Maintain Tian's film acquisition CRM across Clients, Projects, and
 
 # Film Acquisition CRM
 
-Version: `1.6.3`
+Version: `1.7.0`
 
 The CRM is a compact action system. It should answer:
 
@@ -91,7 +91,7 @@ Rules:
 - Before updating Clients, read every row with the same `客户ID` and identify the exact matter from its current `下一步行动` and `备注`. Do not use the changing action text as a stable key, and do not overwrite another matter belonging to the same client. Ask Tian when the target matter remains ambiguous.
 - When the main contact changes, update all relevant active rows for that client so repeated contact details remain consistent.
 - Put flexible background, secondary contacts, title history, lineup metadata, and non-actionable context in `备注`.
-- An active client matter should normally have a next action date. A blank date is allowed only when there is genuinely no active reminder; never invent a date.
+- An active client matter should normally have a next action date. After a verified inbound reply, a blank date is not allowed unless Tian explicitly decides that the matter is permanently dormant. For a reply that needs no immediate response, use a review date and write `检查：定期查看片单/项目` (or an equivalent concrete review action) instead of silently dropping the matter from the queue.
 
 ### Promoting A Client Matter To Projects
 
@@ -246,6 +246,30 @@ Do not pre-commit future states:
 - Attachment mentioned but not saved: do not record it as archived.
 - Send verified: update the actual send date, next action, and next action date.
 
+### Inbound Mail Reconciliation Gate
+
+Reading a relevant inbound email is not complete until its CRM effect has been reconciled. This gate applies whenever Tian asks to check, scan, review, follow up on, or identify pending work in the mailbox, and whenever an email task also mentions CRM.
+
+For every inbound message from a company or contact represented in the CRM:
+
+1. Match it to the correct matter using normalized email address, thread headers, company, title/package, and the current CRM action text. If more than one matter is plausible, stop and ask Tian instead of guessing.
+2. Compare the email date with the row's `最近处理日期`. A newer valid reply must be treated as an unsynchronized CRM event.
+3. Classify the message before writing:
+   - `有效回复`: a human response containing a decision, answer, availability, price, title list, attachment, or other action-relevant fact.
+   - `自动回复`: record only the stated return date or availability when relevant; do not treat it as a substantive reply.
+   - `newsletter/无关邮件`: do not update the acquisition matter.
+4. For a valid reply, update the exact owning row with the inbound date, the current action fact, and a concise note. If a lineup or catalogue was sent, record `片单状态：有片单`; record `已保存` only after the attachment has actually been downloaded and verified.
+5. Derive a next action and date. If no immediate outreach is needed, set a review date using the CRM defaults and an explicit check action. Never use `暂不跟进` as a reason to leave the matter untracked.
+6. After writing, read the exact edited range back and verify that the sender, matter, inbound date, action, and next date are under the intended headers.
+
+Every mailbox review must end with one of these explicit outcomes for each relevant inbound message:
+
+- `已同步 CRM`;
+- `无需同步` with the reason (for example, newsletter or duplicate); or
+- `待确认` with the exact ambiguity Tian must resolve.
+
+Do not report a mailbox review as complete while a newer valid inbound reply remains unmatched or while a row still says `待要片单` after the email clearly says that a lineup was sent.
+
 ## Contract File Evidence
 
 The live Feishu CRM remains the action system. Tian's approved local project folders are supporting evidence and the current working archive for contract documents, invoices, copyright documents, apostilles, censorship files, media, and materials.
@@ -305,6 +329,9 @@ When checking due items or validating a write, scan all three tabs for:
 4. The same active matter appearing in more than one tab.
 5. Projects or Contracts with missing required IDs.
 6. Contracts marked `完结` while applicable payments, copyright/apostille, censorship, or delivery checkpoints are still incomplete.
+7. Valid inbound emails newer than the matched row's `最近处理日期`.
+8. Rows whose notes or action imply that a lineup/catalogue was received while the recorded lineup state still says `待要片单`.
+9. Client matters with a substantive inbound reply but no next action date or review action.
 
 Treat `关闭`, `已转合同`, and `完结` as valid terminal markers according to the tab rules above. Report health-check findings separately from actual due items, and do not change data during a read-only check unless Tian explicitly asks.
 
@@ -331,6 +358,7 @@ When Tian does not specify a date, suggest the following defaults; never overrid
 - Contract, invoice, copyright, apostille, censorship, or delivery matters: 3 to 5 days.
 - Automatic replies: 5 days after the stated return date.
 - Relationship maintenance or general lineup refresh: 30 days.
+- Received lineup with no immediate title to discuss: 30 days for a review action, unless Tian specifies another interval.
 - Rights or availability that depend on a known future date: use that actual trigger date rather than inventing a short reminder.
 
 ## Auxiliary Sheets
